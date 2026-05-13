@@ -54,12 +54,12 @@ async function goSettings() {
 <template>
   <div class="dy-shell">
     <aside class="dy-aside">
-      <RouterLink class="dy-logo" to="/">ShortVideo</RouterLink>
+      <RouterLink class="dy-logo" to="/">RedNote Demo</RouterLink>
 
       <nav class="dy-nav">
         <RouterLink class="dy-nav-link" to="/">推荐</RouterLink>
         <RouterLink class="dy-nav-link" to="/hot">热榜</RouterLink>
-        <RouterLink class="dy-nav-link" to="/video">发布</RouterLink>
+        <RouterLink class="dy-nav-link" to="/video">发布笔记</RouterLink>
         <RouterLink class="dy-nav-link" to="/account">账号</RouterLink>
         <RouterLink v-if="auth.isLoggedIn" class="dy-nav-link" to="/messages">私信</RouterLink>
         <RouterLink class="dy-nav-link" to="/settings">设置</RouterLink>
@@ -84,12 +84,12 @@ async function goSettings() {
         </div>
 
         <div class="dy-search">
-          <input v-model="search" class="dy-search-input" placeholder="搜索标题 / 作者（本地过滤）" @keydown.enter="onSearch" />
+          <input v-model="search" class="dy-search-input" placeholder="搜索标题 / 作者 / 文案（本地过滤）" @keydown.enter="onSearch" />
           <button class="dy-btn dy-btn-primary" type="button" @click="onSearch">搜索</button>
         </div>
 
         <div class="dy-top-right">
-          <RouterLink class="dy-btn dy-btn-ghost" to="/video">+ 发布视频</RouterLink>
+          <RouterLink class="dy-btn dy-btn-ghost" to="/video">+ 发布笔记</RouterLink>
         </div>
       </header>
 

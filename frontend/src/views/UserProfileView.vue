@@ -202,7 +202,7 @@ onMounted(loadProfile)
         </button>
         <div class="metric static">
           <div class="metric-num">{{ state.videos.length }}</div>
-          <div class="metric-label">作品</div>
+          <div class="metric-label">笔记</div>
         </div>
         <div v-if="!auth.isLoggedIn" class="subtle" style="margin-left: 8px">登录后可查看粉丝/关注列表</div>
         <div v-else-if="state.socialError" class="subtle" style="margin-left: 8px">社交信息加载失败：{{ state.socialError }}</div>
@@ -211,11 +211,11 @@ onMounted(loadProfile)
 
     <div class="card" style="margin-top: 14px">
       <div class="row" style="justify-content: space-between">
-        <p class="title" style="margin: 0">作品</p>
-        <div class="subtle">点击封面进入播放页</div>
+        <p class="title" style="margin: 0">公开笔记</p>
+        <div class="subtle">点击封面进入笔记详情</div>
       </div>
 
-      <div v-if="state.videos.length === 0" class="hint" style="margin-top: 12px">暂无作品</div>
+      <div v-if="state.videos.length === 0" class="hint" style="margin-top: 12px">这个账号还没有发布笔记</div>
 
       <div v-else class="video-grid" style="margin-top: 12px">
         <button v-for="v in state.videos" :key="v.id" class="video-card" type="button" @click="goVideo(v.id)">

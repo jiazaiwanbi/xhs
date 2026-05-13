@@ -28,7 +28,7 @@ function onToggle() {
             <RouterLink :to="`/video/${item.id}`">{{ item.title }}</RouterLink>
           </div>
           <div class="subtle">
-            作者：{{ item.author.username }} (#{{ item.author.id }}) · 创建时间：{{ new Date(item.create_time * 1000).toLocaleString() }}
+            @{{ item.author.username }} · #{{ item.author.id }} · {{ new Date(item.create_time * 1000).toLocaleString() }}
           </div>
         </div>
         <div class="row">
@@ -45,10 +45,10 @@ function onToggle() {
           </button>
         </div>
       </div>
-      <div v-if="item.description" class="muted" style="margin-top: 8px">{{ item.description }}</div>
-      <div class="row" style="margin-top: 10px">
-        <a class="pill mono" :href="item.play_url" target="_blank" rel="noreferrer">播放地址</a>
-        <RouterLink class="pill" :to="`/video/${item.id}`">查看详情 / 评论</RouterLink>
+      <div v-if="item.description" class="note-copy">{{ item.description }}</div>
+      <div class="row" style="margin-top: 12px">
+        <a class="pill mono" :href="item.cover_url || item.play_url" target="_blank" rel="noreferrer">原图</a>
+        <RouterLink class="pill" :to="`/video/${item.id}`">查看笔记 / 评论</RouterLink>
       </div>
     </div>
   </div>
@@ -57,17 +57,17 @@ function onToggle() {
 <style scoped>
 .feed-card {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 14px;
+  gap: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   overflow: hidden;
+  break-inside: avoid;
 }
 
 .cover {
   background: rgba(0, 0, 0, 0.25);
-  aspect-ratio: 16/9;
+  aspect-ratio: 4/5;
 }
 
 .cover img {
@@ -81,9 +81,13 @@ function onToggle() {
   padding: 12px 12px 14px;
 }
 
-@media (max-width: 900px) {
-  .feed-card {
-    grid-template-columns: 1fr;
-  }
+.note-copy {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

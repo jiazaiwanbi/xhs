@@ -22,7 +22,7 @@ export function normalizeFeedVideoItem(value: FeedVideoItem): FeedVideoItem {
   return {
     ...value,
     author: normalizeAuthor(value.author),
-    title: value.title || '未命名视频',
+    title: value.title || '未命名笔记',
     description: value.description || '',
     play_url: value.play_url || '',
     cover_url: value.cover_url || '',
@@ -40,7 +40,7 @@ export function normalizeVideoList(value: Video[] | null | undefined): Video[] {
   return listOrEmpty(value).map((video) => ({
     ...video,
     username: video.username || '匿名用户',
-    title: video.title || '未命名视频',
+    title: video.title || '未命名笔记',
     description: video.description || '',
     play_url: video.play_url || '',
     cover_url: video.cover_url || '',

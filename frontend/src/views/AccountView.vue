@@ -264,11 +264,11 @@ watch(
           </button>
           <button class="metric" type="button" :class="{ active: videoTab === 'works' }" @click="openWorksVideos">
             <div class="metric-num">{{ myVideos.loading ? '…' : myVideos.items.length }}</div>
-            <div class="metric-label">作品</div>
+            <div class="metric-label">笔记</div>
           </button>
           <button class="metric" type="button" :class="{ active: videoTab === 'likes' }" @click="openLikedVideos">
             <div class="metric-num">{{ likedVideos.loading ? '…' : likedVideos.loaded ? likedVideos.items.length : '—' }}</div>
-            <div class="metric-label">点赞</div>
+            <div class="metric-label">赞过</div>
           </button>
           <div v-if="socialErrorHint" class="subtle" style="margin-left: 8px">社交信息加载失败：{{ socialErrorHint }}</div>
         </div>
@@ -276,14 +276,14 @@ watch(
 
       <div class="card" style="margin-top: 14px">
         <div class="row" style="justify-content: space-between">
-          <p class="title" style="margin: 0">{{ videoTab === 'works' ? '作品' : '点赞视频' }}</p>
-          <div class="subtle">点击封面进入播放页</div>
+          <p class="title" style="margin: 0">{{ videoTab === 'works' ? '我的笔记' : '赞过的笔记' }}</p>
+          <div class="subtle">点击封面进入笔记详情</div>
         </div>
 
         <template v-if="videoTab === 'works'">
           <div v-if="myVideos.loading" class="hint" style="margin-top: 12px">加载中…</div>
           <div v-else-if="myVideos.error" class="hint bad" style="margin-top: 12px">{{ myVideos.error }}</div>
-          <div v-else-if="myVideos.items.length === 0" class="hint" style="margin-top: 12px">暂无作品</div>
+          <div v-else-if="myVideos.items.length === 0" class="hint" style="margin-top: 12px">还没有发布笔记</div>
 
           <div v-else class="video-grid" style="margin-top: 12px">
             <button v-for="v in myVideos.items" :key="v.id" class="video-card" type="button" @click="goVideo(v.id)">
@@ -298,7 +298,7 @@ watch(
         <template v-else>
           <div v-if="likedVideos.loading" class="hint" style="margin-top: 12px">加载中…</div>
           <div v-else-if="likedVideos.error" class="hint bad" style="margin-top: 12px">{{ likedVideos.error }}</div>
-          <div v-else-if="likedVideos.items.length === 0" class="hint" style="margin-top: 12px">暂无点赞视频</div>
+          <div v-else-if="likedVideos.items.length === 0" class="hint" style="margin-top: 12px">还没有收藏喜欢的笔记</div>
 
           <div v-else class="video-grid" style="margin-top: 12px">
             <button v-for="v in likedVideos.items" :key="v.id" class="video-card" type="button" @click="goVideo(v.id)">

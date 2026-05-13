@@ -79,8 +79,8 @@ onMounted(async () => {
     <div class="card">
       <div class="row" style="justify-content: space-between; align-items: baseline">
         <div>
-          <p class="title" style="margin: 0">热榜</p>
-          <p class="subtle" style="margin: 6px 0 0">按热度排序（/feed/listByPopularity）</p>
+          <p class="title" style="margin: 0">爆款笔记热榜</p>
+          <p class="subtle" style="margin: 6px 0 0">按互动热度排序，适合演示热门图文内容流</p>
         </div>
 
         <div class="row">
