@@ -1,4 +1,4 @@
-import { useAuthStore } from '../stores/auth'
+import { authStore } from '../stores/auth'
 import { reportError } from '../utils/error-reporter'
 
 export class ApiError extends Error {
@@ -21,7 +21,7 @@ let isRefreshing = false
 let refreshPromise: Promise<string | null> | null = null
 
 async function tryRefresh(): Promise<string | null> {
-  const auth = useAuthStore()
+  const auth = authStore.getSnapshot()
   if (!auth.refreshToken) return null
   if (isRefreshing) return refreshPromise
   isRefreshing = true
@@ -32,12 +32,12 @@ async function tryRefresh(): Promise<string | null> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: auth.refreshToken }),
       })
-      if (!res.ok) { auth.clearTokens(); return null }
+      if (!res.ok) { authStore.clearTokens(); return null }
       const data = await res.json()
-      auth.setToken(data.token)
+      authStore.setToken(data.token)
       return data.token as string
     } catch {
-      auth.clearTokens()
+      authStore.clearTokens()
       return null
     } finally {
       isRefreshing = false
@@ -47,7 +47,7 @@ async function tryRefresh(): Promise<string | null> {
 }
 
 export async function postJson<T>(path: string, body: unknown, options?: { authRequired?: boolean }): Promise<T> {
-  const auth = useAuthStore()
+  const auth = authStore.getSnapshot()
   const token = auth.token
 
   if (options?.authRequired && !token) {
@@ -78,7 +78,7 @@ export async function postJson<T>(path: string, body: unknown, options?: { authR
 }
 
 export async function postForm<T>(path: string, body: FormData, options?: { authRequired?: boolean }): Promise<T> {
-  const auth = useAuthStore()
+  const auth = authStore.getSnapshot()
   const token = auth.token
 
   if (options?.authRequired && !token) {
@@ -109,7 +109,7 @@ export async function postForm<T>(path: string, body: FormData, options?: { auth
 }
 
 async function handleResponse<T>(res: Response, path: string): Promise<T> {
-  const auth = useAuthStore()
+  const auth = authStore
   const text = await res.text()
   let data: unknown = null
   if (text) {
