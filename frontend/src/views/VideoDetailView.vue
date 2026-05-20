@@ -525,12 +525,48 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
+  .wrap {
+    padding: 14px 12px 24px;
+  }
+
   .note-shell {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .note-cover-wrap {
     position: static;
+  }
+
+  .note-cover {
+    aspect-ratio: 4 / 3;
+    max-height: 46vh;
+  }
+
+  .note-main,
+  .side-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .title {
+    font-size: 22px;
+    line-height: 1.18;
+    margin: 10px 0 8px;
+  }
+
+  .desc {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .actions {
+    margin-top: 14px;
+    gap: 10px;
+  }
+
+  .act {
+    padding: 10px 14px;
   }
 }
 </style>

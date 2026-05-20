@@ -35,7 +35,7 @@ const filteredItems = computed(() => {
 const tabCopy = computed(() => {
   if (tab.value === 'following') return '看看你关注的人最近都在发什么图文内容。'
   if (tab.value === 'hot') return '按热度排序，适合展示“爆款图文内容”的效果。'
-  return '推荐流已经从短视频风格切成图文笔记瀑布流，更适合面试时演示小红书式社区产品。'
+  return '推荐流会持续展示精选图文笔记，适合演示社区内容分发与兴趣推荐效果。'
 })
 
 async function refreshCurrentTab() {
@@ -69,7 +69,7 @@ onMounted(async () => {
       <section class="hero">
         <div>
           <div class="hero-kicker">图文社区 Demo</div>
-          <h1 class="hero-title">把原来的短视频流，快速改成了小红书风格的图文瀑布流</h1>
+          <h1 class="hero-title">沉浸式浏览精选图文笔记，快速体验小红书风格社区首页</h1>
           <p class="hero-copy">{{ tabCopy }}</p>
         </div>
         <div class="hero-tabs">

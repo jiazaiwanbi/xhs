@@ -18,9 +18,9 @@ function onToggle() {
 
 <template>
   <div class="feed-card">
-    <div class="cover">
+    <RouterLink class="cover" :to="`/video/${item.id}`" :aria-label="`查看笔记：${item.title}`">
       <img :src="item.cover_url" :alt="item.title" loading="lazy" />
-    </div>
+    </RouterLink>
     <div class="content">
       <div class="row" style="justify-content: space-between">
         <div>
@@ -66,8 +66,20 @@ function onToggle() {
 }
 
 .cover {
+  display: block;
   background: rgba(0, 0, 0, 0.25);
   aspect-ratio: 4/5;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cover:hover img {
+  transform: scale(1.02);
+}
+
+.cover:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: -2px;
 }
 
 .cover img {
@@ -75,6 +87,17 @@ function onToggle() {
   height: 100%;
   object-fit: cover;
   display: block;
+  cursor: pointer;
+  transition: transform 0.18s ease;
+}
+
+.title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.title a:hover {
+  text-decoration: underline;
 }
 
 .content {
