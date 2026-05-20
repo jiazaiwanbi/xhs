@@ -36,7 +36,14 @@ export default function App() {
       <Route path="/video/:id" element={<VideoDetailView />} />
       <Route path="/account" element={<AccountView />} />
       <Route path="/account/register" element={<RegisterView />} />
-      <Route path="/account/change-password" element={<ChangePasswordView />} />
+      <Route
+        path="/account/change-password"
+        element={
+          <RequireAuth>
+            <ChangePasswordView />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/settings"
         element={
@@ -55,7 +62,7 @@ export default function App() {
         }
       />
       <Route
-        path="/messages/:peerId"
+        path="/messages/:threadId"
         element={
           <RequireAuth>
             <MessageView />

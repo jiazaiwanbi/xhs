@@ -4,23 +4,27 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import * as accountApi from '../api/account'
 import AppShell from '../components/AppShell'
+import { useAuth } from '../stores/auth'
 import { useToast } from '../stores/toast'
 
 export default function ChangePasswordView() {
   const navigate = useNavigate()
+  const auth = useAuth()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ username: '', oldPassword: '', newPassword: '' })
+  const [form, setForm] = useState({ oldPassword: '', newPassword: '' })
+  const username = auth.claims?.username ?? ''
 
   async function submit() {
     if (busy) return
-    const username = form.username.trim()
     const oldPassword = form.oldPassword.trim()
     const newPassword = form.newPassword.trim()
-    if (!username || !oldPassword || !newPassword) return toast.error('请把信息填完整')
+    if (!username) return toast.error('登录信息已失效，请重新登录')
+    if (!oldPassword || !newPassword) return toast.error('请把信息填完整')
     setBusy(true)
     try {
       await accountApi.changePassword(username, oldPassword, newPassword)
+      auth.clearTokens()
       toast.success('密码已修改，请重新登录')
       await navigate('/account')
     } catch (e) {
@@ -35,10 +39,8 @@ export default function ChangePasswordView() {
       <div className="grid two">
         <div className="card">
           <p className="title">修改密码</p>
-          <p className="subtle">不需要登录（对应后端 `/account/changePassword`）。</p>
+          <p className="subtle">当前账号：@{username}</p>
           <div className="grid spaced">
-            <label>username</label>
-            <input value={form.username} autoComplete="username" onChange={(e) => setForm((s) => ({ ...s, username: e.target.value.trim() }))} />
             <label>old_password</label>
             <input value={form.oldPassword} type="password" autoComplete="current-password" onChange={(e) => setForm((s) => ({ ...s, oldPassword: e.target.value.trim() }))} />
             <label>new_password</label>

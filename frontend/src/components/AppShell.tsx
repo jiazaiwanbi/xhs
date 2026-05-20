@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode, type UIEvent } from 'reac
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../stores/auth'
+import { useNotification } from '../stores/notification'
 import { useSocial } from '../stores/social'
 import Toaster from './Toaster'
 
@@ -15,6 +16,7 @@ export default function AppShell({
   onContentScroll?: (event: UIEvent<HTMLDivElement>) => void
 }) {
   const auth = useAuth()
+  const notifications = useNotification()
   const social = useSocial()
   const navigate = useNavigate()
   const location = useLocation()
@@ -63,7 +65,7 @@ export default function AppShell({
           </NavLink>
           {auth.isLoggedIn ? (
             <NavLink className="dy-nav-link" to="/messages">
-              私信
+              消息
             </NavLink>
           ) : null}
           <NavLink className="dy-nav-link" to="/settings">
@@ -101,6 +103,12 @@ export default function AppShell({
             </button>
           </div>
           <div className="dy-top-right">
+            {auth.isLoggedIn ? (
+              <Link className="dy-btn dy-btn-ghost dy-bell-btn" to="/messages/likes">
+                <span>铃铛</span>
+                {notifications.unreadCount > 0 ? <b className="dy-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</b> : null}
+              </Link>
+            ) : null}
             <Link className="dy-btn dy-btn-ghost" to="/video">
               + 发布笔记
             </Link>
@@ -119,7 +127,7 @@ export default function AppShell({
           </NavLink>
           {auth.isLoggedIn ? (
             <NavLink className="dy-mobile-link" to="/messages">
-              私信
+              消息
             </NavLink>
           ) : null}
           <NavLink className="dy-mobile-link" to="/account">

@@ -11,6 +11,7 @@ import (
 	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/readmodel"
 
 	localcache "github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
@@ -71,6 +72,9 @@ func (vs *VideoService) Publish(ctx context.Context, video *Video) error {
 		}
 		return nil
 	})
+	if err == nil {
+		vs.saveFeedReadModel(ctx, video)
+	}
 	return err
 
 }
@@ -90,6 +94,7 @@ func (vs *VideoService) Delete(ctx context.Context, id uint, authorID uint) erro
 		return err
 	}
 	vs.delLocalDetail(id)
+	vs.deleteFeedReadModel(id)
 	if vs.cache != nil {
 		cacheKey := vs.cache.Key("video:detail:id=%d", id)
 		_ = vs.cache.Del(context.Background(), cacheKey)
@@ -206,6 +211,7 @@ func (vs *VideoService) UpdateLikesCount(ctx context.Context, id uint, likesCoun
 		return err
 	}
 	vs.delLocalDetail(id)
+	vs.setFeedReadModelLikesCount(ctx, id, likesCount)
 	if vs.cache != nil {
 		_ = vs.cache.Del(context.Background(), vs.cache.Key("video:detail:id=%d", id))
 	}
@@ -261,4 +267,32 @@ func (vs *VideoService) invalidateDetail(id uint) {
 	if vs.cache != nil {
 		_ = vs.cache.Del(context.Background(), vs.cache.Key("video:detail:id=%d", id))
 	}
+}
+
+func (vs *VideoService) saveFeedReadModel(ctx context.Context, v *Video) {
+	if vs.cache == nil || v == nil {
+		return
+	}
+	cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.CreateTime, v.LikesCount, v.Popularity)
+	_ = readmodel.SaveFeedVideoItem(cacheCtx, vs.cache, item, readmodel.FeedVideoItemTTL)
+}
+
+func (vs *VideoService) deleteFeedReadModel(id uint) {
+	if vs.cache == nil || id == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_ = readmodel.DeleteFeedVideoItem(ctx, vs.cache, id)
+}
+
+func (vs *VideoService) setFeedReadModelLikesCount(ctx context.Context, id uint, likesCount int64) {
+	if vs.cache == nil || id == 0 {
+		return
+	}
+	cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	_ = readmodel.SetFeedVideoLikesCount(cacheCtx, vs.cache, id, likesCount)
 }

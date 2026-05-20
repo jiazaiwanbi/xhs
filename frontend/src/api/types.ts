@@ -13,6 +13,21 @@ export type ListMessagesResponse = {
   messages: DirectMessage[]
 }
 
+export type NotificationItem = {
+  id: number
+  recipient_id: number
+  sender_id: number
+  type: string
+  target_id: number
+  content: string
+  is_read: boolean
+  created_at: string
+}
+
+export type ListNotificationsResponse = {
+  notifications: NotificationItem[]
+}
+
 export type TokenResponse = { token: string; refresh_token?: string; account_id?: number; username?: string }
 
 export type Account = {

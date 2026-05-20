@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './style.css'
 import { AuthProvider } from './stores/auth'
+import { NotificationProvider } from './stores/notification'
 import { SocialProvider } from './stores/social'
 import { ToastProvider } from './stores/toast'
 import { reportError } from './utils/error-reporter'
@@ -18,9 +19,11 @@ ReactDOM.createRoot(document.getElementById('app')!).render(
     <AuthProvider>
       <ToastProvider>
         <SocialProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <NotificationProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </NotificationProvider>
         </SocialProvider>
       </ToastProvider>
     </AuthProvider>

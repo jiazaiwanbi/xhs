@@ -111,9 +111,6 @@ export default function AccountView() {
               <button className="ghost" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>
                 注册账号
               </button>
-              <button className="ghost" type="button" disabled={busy} onClick={() => void navigate('/account/change-password')}>
-                修改密码
-              </button>
             </div>
           </div>
         </div>

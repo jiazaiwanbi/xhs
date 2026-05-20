@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/readmodel"
 	"feedsystem_video_go/internal/video"
 	"fmt"
 	"log"
@@ -191,7 +192,11 @@ func (f *FeedService) ListLatest(ctx context.Context, limit int, latestBefore ti
 		reqTime = latestBefore.UnixMilli()
 	}
 
-	var baseVideos []*video.Video
+	var (
+		baseVideos []*video.Video
+		feedVideos []FeedVideoItem
+	)
+	usedReadModel := false
 
 	if reqTime <= watermark {
 		//冷数据降级查库
@@ -227,19 +232,20 @@ func (f *FeedService) ListLatest(ctx context.Context, limit int, latestBefore ti
 		}
 
 		if len(videoIDs) > 0 {
-			baseVideos, err = f.GetVideoByIDs(ctx, videoIDs)
+			feedVideos, err = f.GetFeedItemsByIDs(ctx, videoIDs, viewerAccountID)
 			if err != nil {
 				return ListLatestResponse{}, err
 			}
+			usedReadModel = len(feedVideos) > 0
 		}
 
 		// 刚好击穿了冷热边界
-		if len(baseVideos) < limit {
-			remainLimit := limit - len(baseVideos) // 计算还差几个
+		if len(feedVideos) < limit {
+			remainLimit := limit - len(feedVideos) // 计算还差几个
 
 			var coldCursor time.Time
-			if len(baseVideos) > 0 {
-				coldCursor = baseVideos[len(baseVideos)-1].CreateTime
+			if len(feedVideos) > 0 {
+				coldCursor = time.Unix(feedVideos[len(feedVideos)-1].CreateTime, 0)
 			} else {
 				coldCursor = latestBefore
 			}
@@ -251,23 +257,29 @@ func (f *FeedService) ListLatest(ctx context.Context, limit int, latestBefore ti
 
 			if err == nil {
 				coldVideos := v.([]*video.Video)
-				baseVideos = append(baseVideos, coldVideos...)
+				coldFeedVideos, buildErr := f.buildFeedVideos(ctx, coldVideos, viewerAccountID)
+				if buildErr != nil {
+					return ListLatestResponse{}, buildErr
+				}
+				feedVideos = append(feedVideos, coldFeedVideos...)
 			}
 		}
 	}
 
 	var nextTime int64
-	if len(baseVideos) > 0 {
+	if len(feedVideos) > 0 {
 		// 将本页最后一条视频的时间作为下一次请求的游标
-		nextTime = baseVideos[len(baseVideos)-1].CreateTime.UnixMilli()
+		nextTime = feedVideos[len(feedVideos)-1].CreateTime * 1000
 	}
 	var hasMore bool
 
-	hasMore = len(baseVideos) == limit
+	hasMore = len(feedVideos) == limit
 
-	feedVideos, err := f.buildFeedVideos(ctx, baseVideos, viewerAccountID)
-	if err != nil {
-		return ListLatestResponse{}, err
+	if len(baseVideos) > 0 && !usedReadModel {
+		feedVideos, err = f.buildFeedVideos(ctx, baseVideos, viewerAccountID)
+		if err != nil {
+			return ListLatestResponse{}, err
+		}
 	}
 
 	return ListLatestResponse{
@@ -459,36 +471,24 @@ func (f *FeedService) ListByPopularity(ctx context.Context, limit int, reqAsOf i
 				}
 			}
 
-			videos, err := f.repo.GetByIDs(ctx, ids)
+			items, err := f.GetFeedItemsByIDs(ctx, ids, viewerAccountID)
 			if err == nil {
-				byID := make(map[uint]*video.Video, len(videos))
-				for _, v := range videos {
-					byID[v.ID] = v
-				}
-				ordered := make([]*video.Video, 0, len(ids))
-				for _, id := range ids {
-					if v := byID[id]; v != nil {
-						ordered = append(ordered, v)
-					}
-				}
-				items, err := f.buildFeedVideos(ctx, ordered, viewerAccountID)
-				if err != nil {
-					return ListByPopularityResponse{}, err
-				}
 				resp := ListByPopularityResponse{
 					VideoList:  items,
 					AsOf:       asOf.Unix(),
 					NextOffset: offset + len(items),
 					HasMore:    len(items) == limit,
 				}
-				if len(ordered) > 0 {
-					last := ordered[len(ordered)-1]
-					nextPopularity := last.Popularity
-					nextBefore := last.CreateTime
-					nextID := last.ID
-					resp.NextLatestPopularity = &nextPopularity
-					resp.NextLatestBefore = &nextBefore
-					resp.NextLatestIDBefore = &nextID
+				if len(items) > 0 {
+					lastReadModel, ok := f.getFeedReadModel(ctx, items[len(items)-1].ID)
+					if ok {
+						nextPopularity := lastReadModel.Popularity
+						nextBefore := time.UnixMilli(lastReadModel.SortCreateTimeMS)
+						nextID := lastReadModel.ID
+						resp.NextLatestPopularity = &nextPopularity
+						resp.NextLatestBefore = &nextBefore
+						resp.NextLatestIDBefore = &nextID
+					}
 				}
 				if localCacheKey != "" {
 					f.localcache.Set(localCacheKey, resp, hotReadLocalTTL)
@@ -538,17 +538,11 @@ func (f *FeedService) buildFeedVideos(ctx context.Context, videos []*video.Video
 		return nil, err
 	}
 	for _, video := range videos {
-		feedVideos = append(feedVideos, FeedVideoItem{
-			ID:          video.ID,
-			Author:      FeedAuthor{ID: video.AuthorID, Username: video.Username},
-			Title:       video.Title,
-			Description: video.Description,
-			PlayURL:     video.PlayURL,
-			CoverURL:    video.CoverURL,
-			CreateTime:  video.CreateTime.Unix(),
-			LikesCount:  video.LikesCount,
-			IsLiked:     likedMap[video.ID],
-		})
+		readItem := readmodel.NewFeedVideoItem(video.ID, video.AuthorID, video.Username, video.Title, video.Description, video.PlayURL, video.CoverURL, video.CreateTime, video.LikesCount, video.Popularity)
+		item := feedItemFromReadModel(readItem)
+		item.IsLiked = likedMap[video.ID]
+		feedVideos = append(feedVideos, item)
+		f.setFeedReadModel(ctx, readItem)
 	}
 	return feedVideos, nil
 }
@@ -580,4 +574,147 @@ func (f *FeedService) ListByTag(ctx context.Context, tagName string, limit int, 
 		return nil, err
 	}
 	return f.buildFeedVideos(ctx, videos, viewerAccountID)
+}
+
+func (f *FeedService) GetFeedItemsByIDs(ctx context.Context, ids []uint, viewerAccountID uint) ([]FeedVideoItem, error) {
+	if len(ids) == 0 {
+		return []FeedVideoItem{}, nil
+	}
+
+	itemMap := make(map[uint]readmodel.FeedVideoItem, len(ids))
+	missed := make([]uint, 0, len(ids))
+	for _, id := range ids {
+		cacheKey := f.feedItemCacheKey(id)
+		if f.localcache != nil {
+			if cached, found := f.localcache.Get(cacheKey); found {
+				if item, ok := cached.(readmodel.FeedVideoItem); ok {
+					itemMap[id] = item
+					continue
+				}
+			}
+		}
+		missed = append(missed, id)
+	}
+
+	if len(missed) > 0 && f.rediscache != nil {
+		cacheKeys := make([]string, len(missed))
+		for i, id := range missed {
+			cacheKeys[i] = f.feedItemCacheKey(id)
+		}
+		cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+		results, err := f.rediscache.MGet(cacheCtx, cacheKeys...)
+		cancel()
+		if err == nil {
+			nextMissed := make([]uint, 0, len(missed))
+			for i, res := range results {
+				id := missed[i]
+				if res != nil {
+					if str, ok := res.(string); ok {
+						var item readmodel.FeedVideoItem
+						if err := json.Unmarshal([]byte(str), &item); err == nil {
+							itemMap[id] = item
+							if f.localcache != nil {
+								f.localcache.Set(cacheKeys[i], item, 5*time.Second)
+							}
+							continue
+						}
+					}
+				}
+				nextMissed = append(nextMissed, id)
+			}
+			missed = nextMissed
+		}
+	}
+
+	if len(missed) > 0 {
+		videos, err := f.GetVideoByIDs(ctx, missed)
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range videos {
+			if v == nil {
+				continue
+			}
+			item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.CreateTime, v.LikesCount, v.Popularity)
+			itemMap[v.ID] = item
+			f.setFeedReadModel(ctx, item)
+		}
+	}
+
+	likedMap, err := f.likeRepo.BatchGetLiked(ctx, ids, viewerAccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]FeedVideoItem, 0, len(ids))
+	for _, id := range ids {
+		item, ok := itemMap[id]
+		if !ok {
+			continue
+		}
+		resp := feedItemFromReadModel(item)
+		resp.IsLiked = likedMap[id]
+		items = append(items, resp)
+	}
+	return items, nil
+}
+
+func (f *FeedService) setFeedReadModel(ctx context.Context, item readmodel.FeedVideoItem) {
+	cacheKey := f.feedItemCacheKey(item.ID)
+	if f.localcache != nil {
+		f.localcache.Set(cacheKey, item, 5*time.Second)
+	}
+	if f.rediscache == nil {
+		return
+	}
+	go func(item readmodel.FeedVideoItem) {
+		setCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		_ = readmodel.SaveFeedVideoItem(setCtx, f.rediscache, item, readmodel.FeedVideoItemTTL)
+	}(item)
+}
+
+func (f *FeedService) getFeedReadModel(ctx context.Context, id uint) (readmodel.FeedVideoItem, bool) {
+	cacheKey := f.feedItemCacheKey(id)
+	if f.localcache != nil {
+		if cached, found := f.localcache.Get(cacheKey); found {
+			if item, ok := cached.(readmodel.FeedVideoItem); ok {
+				return item, true
+			}
+		}
+	}
+	if f.rediscache == nil {
+		return readmodel.FeedVideoItem{}, false
+	}
+	cacheCtx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+	defer cancel()
+	item, ok, err := readmodel.LoadFeedVideoItem(cacheCtx, f.rediscache, id)
+	if err != nil || !ok {
+		return readmodel.FeedVideoItem{}, false
+	}
+	if f.localcache != nil {
+		f.localcache.Set(cacheKey, item, 5*time.Second)
+	}
+	return item, true
+}
+
+func (f *FeedService) feedItemCacheKey(id uint) string {
+	if f.rediscache != nil {
+		return readmodel.FeedVideoItemKey(f.rediscache, id)
+	}
+	return fmt.Sprintf("feed:item:%d", id)
+}
+
+func feedItemFromReadModel(item readmodel.FeedVideoItem) FeedVideoItem {
+	return FeedVideoItem{
+		ID:          item.ID,
+		Author:      FeedAuthor{ID: item.Author.ID, Username: item.Author.Username},
+		Title:       item.Title,
+		Description: item.Description,
+		PlayURL:     item.PlayURL,
+		CoverURL:    item.CoverURL,
+		CreateTime:  item.CreateTime,
+		LikesCount:  item.LikesCount,
+		IsLiked:     item.IsLiked,
+	}
 }

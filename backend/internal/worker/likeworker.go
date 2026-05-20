@@ -5,21 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
+	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/readmodel"
 	"feedsystem_video_go/internal/video"
-	"log"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 	"time"
 )
 
 type LikeWorker struct {
-	ch    *amqp.Channel
+	ch     *amqp.Channel
 	likes  *video.LikeRepository
 	videos *video.VideoRepository
-	queue string
+	cache  *rediscache.Client
+	queue  string
 }
 
-func NewLikeWorker(ch *amqp.Channel, likes *video.LikeRepository, videos *video.VideoRepository, queue string) *LikeWorker {
-	return &LikeWorker{ch: ch, likes: likes, videos: videos, queue: queue}
+func NewLikeWorker(ch *amqp.Channel, likes *video.LikeRepository, videos *video.VideoRepository, cache *rediscache.Client, queue string) *LikeWorker {
+	return &LikeWorker{ch: ch, likes: likes, videos: videos, cache: cache, queue: queue}
 }
 
 func (w *LikeWorker) Run(ctx context.Context) error {
@@ -115,6 +118,9 @@ func (w *LikeWorker) applyLike(ctx context.Context, userID, videoID uint) error 
 	if err := w.videos.ChangeLikesCount(ctx, videoID, 1); err != nil {
 		return err
 	}
+	if err := readmodel.ChangeFeedVideoLikesCount(ctx, w.cache, videoID, 1); err != nil {
+		log.Printf("like worker: feed read model update skipped for like video=%d: %v", videoID, err)
+	}
 	return w.videos.ChangePopularity(ctx, videoID, 1)
 }
 
@@ -137,6 +143,9 @@ func (w *LikeWorker) applyUnlike(ctx context.Context, userID, videoID uint) erro
 
 	if err := w.videos.ChangeLikesCount(ctx, videoID, -1); err != nil {
 		return err
+	}
+	if err := readmodel.ChangeFeedVideoLikesCount(ctx, w.cache, videoID, -1); err != nil {
+		log.Printf("like worker: feed read model update skipped for unlike video=%d: %v", videoID, err)
 	}
 	return w.videos.ChangePopularity(ctx, videoID, -1)
 }

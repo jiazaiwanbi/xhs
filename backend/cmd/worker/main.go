@@ -4,12 +4,12 @@ import (
 	"context"
 	"feedsystem_video_go/internal/config"
 	"feedsystem_video_go/internal/db"
+	mqrabbit "feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
 	"feedsystem_video_go/internal/observability"
 	"feedsystem_video_go/internal/social"
 	"feedsystem_video_go/internal/video"
 	"feedsystem_video_go/internal/worker"
-	mqrabbit "feedsystem_video_go/internal/middleware/rabbitmq"
 	"log"
 	"os"
 	"os/signal"
@@ -135,7 +135,7 @@ func main() {
 	videoRepo := video.NewVideoRepository(sqlDB)
 	likeRepo := video.NewLikeRepository(sqlDB)
 	commentRepo := video.NewCommentRepository(sqlDB)
-	likeWorker := worker.NewLikeWorker(ch, likeRepo, videoRepo, likeQueue)
+	likeWorker := worker.NewLikeWorker(ch, likeRepo, videoRepo, cache, likeQueue)
 	commentWorker := worker.NewCommentWorker(ch, commentRepo, videoRepo, commentQueue)
 	var popularityWorker *worker.PopularityWorker
 	if cache != nil {

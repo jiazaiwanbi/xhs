@@ -5,6 +5,7 @@ import (
 	"errors"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/readmodel"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -102,6 +103,11 @@ func (s *LikeService) Like(ctx context.Context, like *Like) error {
 	if !redisEnqueued {
 		UpdatePopularityCache(ctx, s.cache, like.VideoID, 1)
 	}
+	if !mysqlEnqueued && s.cache != nil {
+		cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+		defer cancel()
+		_ = readmodel.ChangeFeedVideoLikesCount(cacheCtx, s.cache, like.VideoID, 1)
+	}
 	return nil
 }
 
@@ -173,6 +179,11 @@ func (s *LikeService) Unlike(ctx context.Context, like *Like) error {
 	// Fallback: direct Redis update when popularity MQ publish fails.
 	if !redisEnqueued {
 		UpdatePopularityCache(ctx, s.cache, like.VideoID, -1)
+	}
+	if !mysqlEnqueued && s.cache != nil {
+		cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+		defer cancel()
+		_ = readmodel.ChangeFeedVideoLikesCount(cacheCtx, s.cache, like.VideoID, -1)
 	}
 	return nil
 }
