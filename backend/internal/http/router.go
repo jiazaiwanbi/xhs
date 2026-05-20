@@ -2,18 +2,20 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"feedsystem_video_go/internal/account"
 	"feedsystem_video_go/internal/feed"
 	"feedsystem_video_go/internal/message"
 	"feedsystem_video_go/internal/middleware/jwt"
-	"feedsystem_video_go/internal/middleware/ratelimit"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
+	"feedsystem_video_go/internal/middleware/ratelimit"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
 	"feedsystem_video_go/internal/social"
 	"feedsystem_video_go/internal/video"
 	"feedsystem_video_go/internal/worker"
 	"log"
 	"time"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -141,6 +143,19 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 			c.JSON(400, gin.H{"error": "account_id is required"})
 			return
 		}
+		if cache != nil {
+			cacheKey := cache.Key("account:profile:%d", req.AccountID)
+			cacheCtx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Millisecond)
+			b, err := cache.GetBytes(cacheCtx, cacheKey)
+			cancel()
+			if err == nil {
+				var resp account.GetProfileResponse
+				if err := json.Unmarshal(b, &resp); err == nil {
+					c.JSON(200, resp)
+					return
+				}
+			}
+		}
 		acc, err := accountService.FindByID(c.Request.Context(), req.AccountID)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
@@ -151,11 +166,19 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 		followerCount, _ := socialRepository.CountFollowers(c.Request.Context(), req.AccountID)
 		vloggerCount, _ := socialRepository.CountVloggers(c.Request.Context(), req.AccountID)
 
-		c.JSON(200, account.GetProfileResponse{
-			Account: account.FindByIDResponse{ID: acc.ID, Username: acc.Username, AvatarURL: acc.AvatarURL, Bio: acc.Bio},
+		resp := account.GetProfileResponse{
+			Account:    account.FindByIDResponse{ID: acc.ID, Username: acc.Username, AvatarURL: acc.AvatarURL, Bio: acc.Bio},
 			VideoCount: videoCount, TotalLikes: totalLikes,
 			FollowerCount: followerCount, VloggerCount: vloggerCount,
-		})
+		}
+		if cache != nil {
+			if b, err := json.Marshal(resp); err == nil {
+				cacheCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+				defer cancel()
+				_ = cache.SetBytes(cacheCtx, cache.Key("account:profile:%d", req.AccountID), b, 5*time.Second)
+			}
+		}
+		c.JSON(200, resp)
 	})
 	// feed
 	feedRepository := feed.NewFeedRepository(db)

@@ -8,22 +8,24 @@ import (
 	"strings"
 	"time"
 
+	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
-	"feedsystem_video_go/internal/apierror"
 
+	localcache "github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
 )
 
 type VideoService struct {
 	repo         *VideoRepository
 	cache        *rediscache.Client
+	localcache   *localcache.Cache
 	cacheTTL     time.Duration
 	popularityMQ *rabbitmq.PopularityMQ
 }
 
 func NewVideoService(repo *VideoRepository, cache *rediscache.Client, popularityMQ *rabbitmq.PopularityMQ) *VideoService {
-	return &VideoService{repo: repo, cache: cache, cacheTTL: 5 * time.Minute, popularityMQ: popularityMQ}
+	return &VideoService{repo: repo, cache: cache, localcache: localcache.New(3*time.Second, 5*time.Second), cacheTTL: 5 * time.Minute, popularityMQ: popularityMQ}
 }
 
 func (vs *VideoService) Publish(ctx context.Context, video *Video) error {
@@ -87,6 +89,7 @@ func (vs *VideoService) Delete(ctx context.Context, id uint, authorID uint) erro
 	if err := vs.repo.DeleteVideo(ctx, id); err != nil {
 		return err
 	}
+	vs.delLocalDetail(id)
 	if vs.cache != nil {
 		cacheKey := vs.cache.Key("video:detail:id=%d", id)
 		_ = vs.cache.Del(context.Background(), cacheKey)
@@ -104,6 +107,13 @@ func (vs *VideoService) ListByAuthorID(ctx context.Context, authorID uint) ([]Vi
 
 func (vs *VideoService) GetDetail(ctx context.Context, id uint) (*Video, error) {
 	cacheKey := vs.cache.Key("video:detail:id=%d", id)
+	if vs.localcache != nil {
+		if v, found := vs.localcache.Get(cacheKey); found {
+			if cached, ok := v.(Video); ok {
+				return &cached, nil
+			}
+		}
+	}
 
 	getCached := func() (*Video, bool) {
 		opCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
@@ -117,10 +127,12 @@ func (vs *VideoService) GetDetail(ctx context.Context, id uint) (*Video, error) 
 		if err := json.Unmarshal(b, &cached); err != nil {
 			return nil, false
 		}
+		vs.setLocalDetail(cacheKey, &cached)
 		return &cached, true
 	}
 
 	setCached := func(video *Video) {
+		vs.setLocalDetail(cacheKey, video)
 		b, err := json.Marshal(video)
 		if err != nil {
 			return
@@ -193,6 +205,10 @@ func (vs *VideoService) UpdateLikesCount(ctx context.Context, id uint, likesCoun
 	if err := vs.repo.UpdateLikesCount(ctx, id, likesCount); err != nil {
 		return err
 	}
+	vs.delLocalDetail(id)
+	if vs.cache != nil {
+		_ = vs.cache.Del(context.Background(), vs.cache.Key("video:detail:id=%d", id))
+	}
 	return nil
 }
 
@@ -200,6 +216,7 @@ func (vs *VideoService) UpdatePopularity(ctx context.Context, id uint, change in
 	if err := vs.repo.UpdatePopularity(ctx, id, change); err != nil {
 		return err
 	}
+	vs.invalidateDetail(id)
 
 	if vs.popularityMQ != nil {
 		if err := vs.popularityMQ.Update(ctx, id, change); err == nil {
@@ -209,7 +226,7 @@ func (vs *VideoService) UpdatePopularity(ctx context.Context, id uint, change in
 
 	if vs.cache != nil {
 		// 1) 详情缓存：直接失效（最简单靠谱）
-		_ = vs.cache.Del(context.Background(), vs.cache.Key("video:detail:id=%d", id))
+		vs.invalidateDetail(id)
 
 		// 2) 热榜：写到“时间窗ZSET”，不要用 detail key
 		now := time.Now().UTC().Truncate(time.Minute)
@@ -223,4 +240,25 @@ func (vs *VideoService) UpdatePopularity(ctx context.Context, id uint, change in
 		_ = vs.cache.Expire(opCtx, windowKey, 2*time.Hour)
 	}
 	return nil
+}
+
+func (vs *VideoService) setLocalDetail(cacheKey string, video *Video) {
+	if vs.localcache == nil || video == nil {
+		return
+	}
+	vs.localcache.Set(cacheKey, *video, 3*time.Second)
+}
+
+func (vs *VideoService) delLocalDetail(id uint) {
+	if vs.localcache == nil {
+		return
+	}
+	vs.localcache.Delete(vs.cache.Key("video:detail:id=%d", id))
+}
+
+func (vs *VideoService) invalidateDetail(id uint) {
+	vs.delLocalDetail(id)
+	if vs.cache != nil {
+		_ = vs.cache.Del(context.Background(), vs.cache.Key("video:detail:id=%d", id))
+	}
 }

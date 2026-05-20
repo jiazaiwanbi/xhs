@@ -55,7 +55,7 @@ export default function AppShell({
           <NavLink className="dy-nav-link" to="/hot">
             热榜
           </NavLink>
-          <NavLink className="dy-nav-link" to="/video">
+          <NavLink className="dy-nav-link" to="/video" end>
             发布笔记
           </NavLink>
           <NavLink className="dy-nav-link" to="/account">
@@ -114,7 +114,7 @@ export default function AppShell({
           <NavLink className="dy-mobile-link" to="/hot">
             热榜
           </NavLink>
-          <NavLink className="dy-mobile-link" to="/video">
+          <NavLink className="dy-mobile-link" to="/video" end>
             发布
           </NavLink>
           {auth.isLoggedIn ? (

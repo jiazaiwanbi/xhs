@@ -2,12 +2,14 @@ package video
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
-	"feedsystem_video_go/internal/apierror"
 	"regexp"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -58,6 +60,7 @@ func (s *CommentService) Publish(ctx context.Context, comment *Comment) error {
 		}
 	}
 	if mysqlEnqueued && redisEnqueued {
+		s.invalidateCommentList(comment.VideoID)
 		s.notifyMentions(ctx, comment)
 		return nil
 	}
@@ -85,6 +88,7 @@ func (s *CommentService) Publish(ctx context.Context, comment *Comment) error {
 	if !redisEnqueued {
 		UpdatePopularityCache(ctx, s.cache, comment.VideoID, 1)
 	}
+	s.invalidateCommentList(comment.VideoID)
 	s.notifyMentions(ctx, comment)
 	return nil
 }
@@ -102,13 +106,31 @@ func (s *CommentService) Delete(ctx context.Context, commentID uint, accountID u
 	}
 	if s.commentMQ != nil {
 		if err := s.commentMQ.Delete(ctx, commentID); err == nil {
+			s.invalidateCommentList(comment.VideoID)
 			return nil
 		}
 	}
-	return s.repo.DeleteComment(ctx, comment)
+	if err := s.repo.DeleteComment(ctx, comment); err != nil {
+		return err
+	}
+	s.invalidateCommentList(comment.VideoID)
+	return nil
 }
 
 func (s *CommentService) GetAll(ctx context.Context, videoID uint) ([]Comment, error) {
+	if s.cache != nil {
+		cacheKey := s.cache.Key("comment:list:video=%d", videoID)
+		cacheCtx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+		b, err := s.cache.GetBytes(cacheCtx, cacheKey)
+		cancel()
+		if err == nil {
+			var comments []Comment
+			if err := json.Unmarshal(b, &comments); err == nil {
+				return comments, nil
+			}
+		}
+	}
+
 	exists, err := s.VideoRepository.IsExist(ctx, videoID)
 	if err != nil {
 		return nil, err
@@ -116,7 +138,28 @@ func (s *CommentService) GetAll(ctx context.Context, videoID uint) ([]Comment, e
 	if !exists {
 		return nil, errors.New("video not found")
 	}
-	return s.repo.GetAllComments(ctx, videoID)
+	comments, err := s.repo.GetAllComments(ctx, videoID)
+	if err != nil {
+		return nil, err
+	}
+	if s.cache != nil {
+		cacheKey := s.cache.Key("comment:list:video=%d", videoID)
+		if b, err := json.Marshal(comments); err == nil {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+			defer cancel()
+			_ = s.cache.SetBytes(cacheCtx, cacheKey, b, 5*time.Second)
+		}
+	}
+	return comments, nil
+}
+
+func (s *CommentService) invalidateCommentList(videoID uint) {
+	if s.cache == nil || videoID == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	_ = s.cache.Del(ctx, s.cache.Key("comment:list:video=%d", videoID))
 }
 
 var mentionRegex = regexp.MustCompile(`@(\w+)`)

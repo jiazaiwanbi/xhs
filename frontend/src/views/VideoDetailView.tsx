@@ -188,6 +188,20 @@ export default function VideoDetailView() {
                   <span>共 {comments.list.length} 条评论</span>
                   <button className="text-btn" type="button" disabled={comments.loading} onClick={() => void loadComments()}>刷新</button>
                 </div>
+                <div className="comment-composer">
+                  <textarea
+                    value={comments.content}
+                    placeholder="说点什么..."
+                    disabled={comments.loading}
+                    onChange={(e) => setComments((s) => ({ ...s, content: e.target.value }))}
+                  />
+                  <div className="row spread">
+                    <span className="subtle">{auth.isLoggedIn ? '评论会发布到当前笔记' : '登录后可以发表评论'}</span>
+                    <button className="primary send-btn" type="button" disabled={comments.loading || !comments.content.trim()} onClick={() => void publishComment()}>
+                      发送
+                    </button>
+                  </div>
+                </div>
                 <div className="comment-list">
                   {comments.loading ? <div className="drawer-hint">加载中...</div> : null}
                   {comments.error ? <div className="drawer-hint bad">{comments.error}</div> : null}
@@ -208,11 +222,6 @@ export default function VideoDetailView() {
                 </div>
               </section>
               <footer className="action-bar">
-                <div className="comment-input">
-                  <span className="spark">*</span>
-                  <input value={comments.content} placeholder="说点什么..." disabled={comments.loading} onChange={(e) => setComments((s) => ({ ...s, content: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') void publishComment() }} />
-                  <button className="send-btn" type="button" disabled={comments.loading || !comments.content.trim()} onClick={() => void publishComment()}>发送</button>
-                </div>
                 <div className="quick-actions">
                   <button className="icon-btn" type="button" disabled={state.busy} onClick={() => void toggleLike()}><span className={state.isLiked ? 'liked' : ''}>♡</span><b>{video.likes_count}</b></button>
                   <button className="icon-btn" type="button"><span>◎</span><b>{comments.list.length}</b></button>
