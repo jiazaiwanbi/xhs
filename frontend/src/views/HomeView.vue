@@ -14,7 +14,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const toast = useToastStore()
 
-const { tab, following, currentState, loadFollowing, loadRecommend, loadHot, ensureTabLoaded } = useVideoFeed()
+const { tab, following, currentState, loadFollowing, loadLatest, loadHot, ensureTabLoaded } = useVideoFeed()
 
 async function needLogin() {
   toast.error('请先登录')
@@ -35,19 +35,25 @@ const filteredItems = computed(() => {
 const tabCopy = computed(() => {
   if (tab.value === 'following') return '看看你关注的人最近都在发什么图文内容。'
   if (tab.value === 'hot') return '按热度排序，适合展示“爆款图文内容”的效果。'
-  return '推荐流会持续展示精选图文笔记，适合演示社区内容分发与兴趣推荐效果。'
+  return '最新流按发布时间倒序展示图文笔记，适合快速查看社区刚刚更新的内容。'
 })
 
 async function refreshCurrentTab() {
-  if (tab.value === 'recommend') await loadRecommend(true)
+  if (tab.value === 'latest') await loadLatest(true)
   else if (tab.value === 'hot') await loadHot(true)
   else await loadFollowing(true)
 }
 
 async function loadMoreCurrentTab() {
-  if (tab.value === 'recommend') await loadRecommend(false)
+  if (tab.value === 'latest') await loadLatest(false)
   else if (tab.value === 'hot') await loadHot(false)
   else await loadFollowing(false)
+}
+
+async function onPageScroll(event: Event) {
+  const el = event.currentTarget as HTMLElement | null
+  if (!el || currentState.value.loading || !currentState.value.hasMore) return
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) await loadMoreCurrentTab()
 }
 
 watch(() => auth.isLoggedIn, async (v) => {
@@ -64,16 +70,16 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell full>
+  <AppShell full @content-scroll="onPageScroll">
     <div class="page">
       <section class="hero">
         <div>
           <div class="hero-kicker">图文社区 Demo</div>
-          <h1 class="hero-title">沉浸式浏览精选图文笔记，快速体验小红书风格社区首页</h1>
+          <h1 class="hero-title">沉浸式浏览最新图文笔记，快速体验小红书风格社区首页</h1>
           <p class="hero-copy">{{ tabCopy }}</p>
         </div>
         <div class="hero-tabs">
-          <button class="tab" :class="{ on: tab === 'recommend' }" type="button" @click="tab = 'recommend'">推荐</button>
+          <button class="tab" :class="{ on: tab === 'latest' }" type="button" @click="tab = 'latest'">最新</button>
           <button class="tab" :class="{ on: tab === 'following' }" type="button" @click="tab = 'following'">关注</button>
           <button class="tab" :class="{ on: tab === 'hot' }" type="button" @click="tab = 'hot'">热榜</button>
         </div>
@@ -193,12 +199,14 @@ onMounted(async () => {
 }
 
 .waterfall {
-  column-count: 3;
-  column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
 .waterfall :deep(.feed-card) {
-  margin-bottom: 16px;
+  min-width: 0;
 }
 
 @media (max-width: 1000px) {
@@ -211,7 +219,7 @@ onMounted(async () => {
   }
 
   .waterfall {
-    column-count: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -226,7 +234,7 @@ onMounted(async () => {
   }
 
   .waterfall {
-    column-count: 1;
+    grid-template-columns: 1fr;
   }
 }
 </style>

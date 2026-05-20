@@ -212,7 +212,7 @@ onMounted(async () => {
   <AppShell full>
     <div class="page">
       <div class="top">
-        <RouterLink class="chip" to="/">← 返回推荐</RouterLink>
+        <RouterLink class="chip" to="/">← 返回最新</RouterLink>
       </div>
 
       <div class="wrap">

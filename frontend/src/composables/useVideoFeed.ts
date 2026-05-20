@@ -4,13 +4,13 @@ import * as feedApi from '../api/feed'
 import type { FeedVideoItem } from '../api/types'
 import { useAuthStore } from '../stores/auth'
 
-export type TabKey = 'recommend' | 'hot' | 'following'
+export type TabKey = 'latest' | 'hot' | 'following'
 
 export function useVideoFeed() {
   const auth = useAuthStore()
-  const tab = ref<TabKey>('recommend')
+  const tab = ref<TabKey>('latest')
 
-  const recommend = reactive({
+  const latest = reactive({
     items: [] as FeedVideoItem[],
     loading: false, error: '',
     hasMore: false, nextTime: 0,
@@ -33,22 +33,22 @@ export function useVideoFeed() {
   const currentState = computed(() => {
     if (tab.value === 'hot') return hot
     if (tab.value === 'following') return following
-    return recommend
+    return latest
   })
 
-  async function loadRecommend(reset: boolean) {
-    if (recommend.loading) return
-    recommend.loading = true
-    recommend.error = ''
+  async function loadLatest(reset: boolean) {
+    if (latest.loading) return
+    latest.loading = true
+    latest.error = ''
     try {
-      const res = await feedApi.listLatest({ limit: 10, latest_time: reset ? 0 : recommend.nextTime })
-      recommend.hasMore = res.has_more
-      recommend.nextTime = res.next_time
-      recommend.items = reset ? res.video_list : recommend.items.concat(res.video_list)
+      const res = await feedApi.listLatest({ limit: 10, latest_time: reset ? 0 : latest.nextTime })
+      latest.hasMore = res.has_more
+      latest.nextTime = res.next_time
+      latest.items = reset ? res.video_list : latest.items.concat(res.video_list)
     } catch (e) {
-      recommend.error = e instanceof ApiError ? e.message : String(e)
+      latest.error = e instanceof ApiError ? e.message : String(e)
     } finally {
-      recommend.loading = false
+      latest.loading = false
     }
   }
 
@@ -94,7 +94,7 @@ export function useVideoFeed() {
   }
 
   async function ensureTabLoaded() {
-    if (tab.value === 'recommend' && recommend.items.length === 0) await loadRecommend(true)
+    if (tab.value === 'latest' && latest.items.length === 0) await loadLatest(true)
     if (tab.value === 'hot' && hot.items.length === 0) await loadHot(true)
     if (tab.value === 'following' && following.items.length === 0) await loadFollowing(true)
   }
@@ -103,10 +103,10 @@ export function useVideoFeed() {
     const items = currentState.value.items
     if (items.length === 0) return
     if (activeIndex < items.length - 3) return
-    if (tab.value === 'recommend' && recommend.hasMore) await loadRecommend(false)
+    if (tab.value === 'latest' && latest.hasMore) await loadLatest(false)
     if (tab.value === 'hot' && hot.hasMore) await loadHot(false)
     if (tab.value === 'following' && following.hasMore) await loadFollowing(false)
   }
 
-  return { tab, recommend, hot, following, currentState, loadRecommend, loadHot, loadFollowing, ensureTabLoaded, loadMoreIfNeeded }
+  return { tab, latest, hot, following, currentState, loadLatest, loadHot, loadFollowing, ensureTabLoaded, loadMoreIfNeeded }
 }
