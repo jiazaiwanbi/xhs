@@ -27,14 +27,17 @@ jobs:
       matrix:
         include:
           - image: backend-api
+            context: ./backend
             dockerfile: backend/Dockerfile
             target: api
             repository: xhs-backend-api
           - image: backend-worker
+            context: ./backend
             dockerfile: backend/Dockerfile
             target: worker
             repository: xhs-backend-worker
           - image: frontend
+            context: ./frontend
             dockerfile: frontend/Dockerfile
             target: ""
             repository: xhs-frontend
@@ -69,7 +72,7 @@ jobs:
         if: ${{ matrix.target != '' }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
@@ -83,7 +86,7 @@ jobs:
         if: ${{ matrix.target == '' }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true

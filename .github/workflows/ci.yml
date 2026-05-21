@@ -114,12 +114,15 @@ jobs:
       matrix:
         include:
           - image: backend-api
+            context: ./backend
             file: backend/Dockerfile
             target: api
           - image: backend-worker
+            context: ./backend
             file: backend/Dockerfile
             target: worker
           - image: frontend
+            context: ./frontend
             file: frontend/Dockerfile
             target: ""
     steps:
@@ -133,7 +136,7 @@ jobs:
         if: ${{ matrix.target != '' }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           push: false
@@ -145,7 +148,7 @@ jobs:
         if: ${{ matrix.target == '' }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: false
           load: false

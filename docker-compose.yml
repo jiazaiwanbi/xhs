@@ -55,8 +55,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       target: api
     restart: always
     environment:
@@ -86,8 +86,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       target: worker
     restart: always
     environment:
@@ -114,15 +114,15 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     restart: always
     ports:
-      - "5173:80"
+      - "5173:8080"
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -132,4 +132,3 @@ volumes:
   redis_data:
   rabbitmq_data:
   backend_uploads:
-
