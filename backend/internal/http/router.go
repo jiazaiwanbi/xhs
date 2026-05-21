@@ -197,9 +197,11 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 	{
 		protectedFeedGroup.POST("/listByFollowing", feedHandler.ListByFollowing)
 	}
+	sseHub := worker.NewSSEHub(db)
+	messageHub := message.NewStreamHub()
 	// message
 	messageRepo := message.NewRepository(db)
-	messageService := message.NewService(messageRepo)
+	messageService := message.NewService(messageRepo, sseHub, messageHub)
 	messageHandler := message.NewHandler(messageService)
 	messageGroup := r.Group("/message")
 	protectedMessageGroup := messageGroup.Group("")
@@ -208,6 +210,7 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 		protectedMessageGroup.POST("/send", messageHandler.Send)
 		protectedMessageGroup.POST("/list", messageHandler.List)
 	}
+	messageGroup.GET("/stream", message.StreamRequireAuth(), messageHub.StreamHandler)
 	//worker
 	timelineMQ, err := rabbitmq.NewTimelineMQ(rmq)
 	if err != nil {
@@ -223,7 +226,6 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 		rmq.DeclareTopic("comment.events", "notification.comment", "comment.publish")
 		rmq.DeclareTopic("social.events", "notification.social", "social.follow")
 	}
-	sseHub := worker.NewSSEHub(db)
 	notifGroup := r.Group("/notification")
 	notifGroup.Use(sseHub.SSERequireAuth())
 	sseHub.RegisterRoutes(r, notifGroup)

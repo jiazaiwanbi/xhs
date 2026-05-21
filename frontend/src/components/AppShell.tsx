@@ -104,7 +104,7 @@ export default function AppShell({
           </div>
           <div className="dy-top-right">
             {auth.isLoggedIn ? (
-              <Link className="dy-btn dy-btn-ghost dy-bell-btn" to="/messages/likes">
+              <Link className="dy-btn dy-btn-ghost dy-bell-btn" to="/messages">
                 <span>铃铛</span>
                 {notifications.unreadCount > 0 ? <b className="dy-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</b> : null}
               </Link>

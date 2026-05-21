@@ -12,12 +12,14 @@ type NotificationContextValue = {
   notifications: NotificationItem[]
   likes: NotificationItem[]
   replies: NotificationItem[]
+  messages: NotificationItem[]
   loading: boolean
   error: string
   unreadCount: number
   refresh: () => Promise<void>
   clear: () => void
   markCategoryRead: (category: NotificationCategory) => Promise<void>
+  markThreadRead: (senderId: number) => Promise<void>
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null)
@@ -33,11 +35,12 @@ function isReplyType(type: string) {
 }
 
 function isSupportedType(type: string) {
-  return type === 'like' || isReplyType(type)
+  return type === 'like' || type === 'message' || isReplyType(type)
 }
 
 function toMessage(type: string) {
   if (type === 'like') return '收到一个新赞'
+  if (type === 'message') return '收到一条新私信'
   if (type === 'mention') return '有人在评论里提到了你'
   return '收到一条新回复'
 }
@@ -92,6 +95,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     [notifications],
   )
 
+  const markThreadRead = useCallback(
+    async (senderId: number) => {
+      if (senderId <= 0) return
+      const targets = notifications.filter((item) => item.type === 'message' && item.sender_id === senderId && !item.is_read)
+      if (targets.length === 0) return
+      await Promise.all(targets.map((item) => notificationApi.markNotificationRead(item.id)))
+      setNotifications((items) =>
+        items.map((item) =>
+          targets.some((target) => target.id === item.id)
+            ? { ...item, is_read: true }
+            : item,
+        ),
+      )
+    },
+    [notifications],
+  )
+
   useEffect(() => {
     if (!auth.isLoggedIn || !auth.token) {
       streamRef.current?.close()
@@ -130,19 +150,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const value = useMemo<NotificationContextValue>(() => {
     const likes = notifications.filter((item) => item.type === 'like')
     const replies = notifications.filter((item) => isReplyType(item.type))
+    const messages = notifications.filter((item) => item.type === 'message')
     const unreadCount = notifications.reduce((total, item) => total + (item.is_read ? 0 : 1), 0)
     return {
       notifications,
       likes,
       replies,
+      messages,
       loading,
       error,
       unreadCount,
       refresh,
       clear,
       markCategoryRead,
+      markThreadRead,
     }
-  }, [clear, error, loading, markCategoryRead, notifications, refresh])
+  }, [clear, error, loading, markCategoryRead, markThreadRead, notifications, refresh])
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
 }

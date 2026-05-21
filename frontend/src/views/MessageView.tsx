@@ -12,6 +12,8 @@ import { useNotification } from '../stores/notification'
 import { useSocial } from '../stores/social'
 import { useToast } from '../stores/toast'
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api'
+
 export default function MessageView() {
   const { threadId: rawThreadId } = useParams()
   const navigate = useNavigate()
@@ -44,12 +46,24 @@ export default function MessageView() {
     () => (isLikesThread ? notifications.likes : isRepliesThread ? notifications.replies : []),
     [isLikesThread, isRepliesThread, notifications.likes, notifications.replies],
   )
+  const messageUnreadCountBySender = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const item of notifications.messages) {
+      if (item.is_read) continue
+      counts.set(item.sender_id, (counts.get(item.sender_id) ?? 0) + 1)
+    }
+    return counts
+  }, [notifications.messages])
   const contactItems = useMemo(() => {
     const map = new Map<number, Account>()
     for (const user of social.vloggers) map.set(user.id, user)
     for (const user of social.followers) map.set(user.id, user)
-    return [...map.values()].filter((user) => user.id !== myId)
-  }, [myId, social.followers, social.vloggers])
+    for (const item of notifications.messages) {
+      const sender = senderMap[item.sender_id]
+      if (sender) map.set(sender.id, sender)
+    }
+    return [...map.values()]
+  }, [notifications.messages, senderMap, social.followers, social.vloggers])
 
   function formatTime(value: string) {
     const date = new Date(value)
@@ -63,6 +77,11 @@ export default function MessageView() {
     })
   }
 
+  function mergeMessages(current: DirectMessage[], next: DirectMessage) {
+    const deduped = current.filter((item) => item.id !== next.id)
+    return [next, ...deduped]
+  }
+
   async function refreshInbox() {
     await Promise.all([social.refreshMine(), notifications.refresh()])
   }
@@ -72,7 +91,6 @@ export default function MessageView() {
       setState({ loading: false, sending: false, error: '', peer: null, messages: [] })
       return
     }
-    if (peerId === myId) return setState((s) => ({ ...s, error: '请选择其他用户发送私信' }))
     if (!silent) setState((s) => ({ ...s, loading: true, error: '' }))
     try {
       const [peer, res] = await Promise.all([accountApi.findById(peerId), messageApi.listMessages(peerId)])
@@ -89,7 +107,7 @@ export default function MessageView() {
     setState((s) => ({ ...s, sending: true }))
     try {
       const msg = await messageApi.sendMessage(peerId, text)
-      setState((s) => ({ ...s, sending: false, messages: [msg, ...s.messages] }))
+      setState((s) => ({ ...s, sending: false, messages: mergeMessages(s.messages, msg) }))
       setContent('')
       scrollToBottom()
     } catch (e) {
@@ -99,10 +117,10 @@ export default function MessageView() {
   }
 
   useEffect(() => {
-    if (!social.followers.length && !social.vloggers.length && auth.isLoggedIn) {
+    if ((!social.followers.length && !social.vloggers.length) || notifications.messages.some((item) => !senderMap[item.sender_id])) {
       void refreshInbox()
     }
-  }, [auth.isLoggedIn, notifications, social.followers.length, social.vloggers.length])
+  }, [notifications.messages, senderMap, social.followers.length, social.vloggers.length])
 
   useEffect(() => {
     if (!isNotificationThread) return
@@ -110,7 +128,7 @@ export default function MessageView() {
   }, [isLikesThread, isNotificationThread, notifications, isRepliesThread])
 
   useEffect(() => {
-    const ids = [...new Set(activeNotifications.map((item) => item.sender_id).filter((id) => id > 0 && !senderMap[id]))]
+    const ids = [...new Set([...activeNotifications, ...notifications.messages].map((item) => item.sender_id).filter((id) => id > 0 && !senderMap[id]))]
     if (ids.length === 0) return
     let cancelled = false
     void Promise.all(ids.map((id) => accountApi.findById(id).then((account) => [id, account] as const).catch(() => null))).then((items) => {
@@ -127,7 +145,7 @@ export default function MessageView() {
     return () => {
       cancelled = true
     }
-  }, [activeNotifications, senderMap])
+  }, [activeNotifications, notifications.messages, senderMap])
 
   useEffect(() => {
     setContent('')
@@ -141,11 +159,29 @@ export default function MessageView() {
 
   useEffect(() => {
     if (!hasPeer) return
-    const timer = window.setInterval(() => {
-      void loadChat(true)
-    }, 5000)
-    return () => window.clearInterval(timer)
-  }, [hasPeer, peerId])
+    void notifications.markThreadRead(peerId)
+    if (!auth.token) return
+    const stream = new EventSource(`${API_BASE}/message/stream?token=${encodeURIComponent(auth.token)}`)
+    stream.onmessage = (event) => {
+      try {
+        const next = JSON.parse(event.data) as DirectMessage
+        const isForActiveThread =
+          (next.from_id === peerId && next.to_id === myId) ||
+          (next.from_id === myId && next.to_id === peerId)
+        if (!isForActiveThread) return
+        setState((current) => ({ ...current, messages: mergeMessages(current.messages, next) }))
+        if (next.from_id === peerId) {
+          void notifications.markThreadRead(peerId)
+        }
+        scrollToBottom()
+      } catch {
+        // Ignore malformed SSE payloads.
+      }
+    }
+    return () => {
+      stream.close()
+    }
+  }, [auth.token, hasPeer, myId, notifications, peerId])
 
   const contactLoading = social.vloggersLoading || social.followersLoading
   const contactError = social.vloggersError || social.followersError || notifications.error
@@ -188,7 +224,10 @@ export default function MessageView() {
                 <button key={user.id} className={`contact-row ${peerId === user.id ? 'active' : ''}`} type="button" onClick={() => void navigate(`/messages/${user.id}`)}>
                   <UserAvatar username={user.username} id={user.id} size={42} />
                   <span className="contact-meta"><span className="contact-name">@{user.username}</span><span className="contact-id mono">#{user.id}</span></span>
-                  <span className="contact-action">聊天</span>
+                  <span className="contact-side">
+                    {(messageUnreadCountBySender.get(user.id) ?? 0) > 0 ? <b className="count-badge">{messageUnreadCountBySender.get(user.id)! > 99 ? '99+' : messageUnreadCountBySender.get(user.id)}</b> : null}
+                    <span className="contact-action">聊天</span>
+                  </span>
                 </button>
               ))}
             </div>
