@@ -245,7 +245,7 @@ func (f *FeedService) ListLatest(ctx context.Context, limit int, latestBefore ti
 
 			var coldCursor time.Time
 			if len(feedVideos) > 0 {
-				coldCursor = time.Unix(feedVideos[len(feedVideos)-1].CreateTime, 0)
+				coldCursor = time.UnixMilli(f.feedCursorMillis(ctx, feedVideos))
 			} else {
 				coldCursor = latestBefore
 			}
@@ -266,21 +266,21 @@ func (f *FeedService) ListLatest(ctx context.Context, limit int, latestBefore ti
 		}
 	}
 
-	var nextTime int64
-	if len(feedVideos) > 0 {
-		// 将本页最后一条视频的时间作为下一次请求的游标
-		nextTime = feedVideos[len(feedVideos)-1].CreateTime * 1000
-	}
-	var hasMore bool
-
-	hasMore = len(feedVideos) == limit
-
 	if len(baseVideos) > 0 && !usedReadModel {
 		feedVideos, err = f.buildFeedVideos(ctx, baseVideos, viewerAccountID)
 		if err != nil {
 			return ListLatestResponse{}, err
 		}
 	}
+
+	var nextTime int64
+	if len(feedVideos) > 0 {
+		// 将本页最后一条视频的精确毫秒时间作为下一次请求的游标
+		nextTime = f.feedCursorMillis(ctx, feedVideos)
+	}
+	var hasMore bool
+
+	hasMore = len(feedVideos) == limit
 
 	return ListLatestResponse{
 		VideoList: feedVideos,
@@ -717,4 +717,15 @@ func feedItemFromReadModel(item readmodel.FeedVideoItem) FeedVideoItem {
 		LikesCount:  item.LikesCount,
 		IsLiked:     item.IsLiked,
 	}
+}
+
+func (f *FeedService) feedCursorMillis(ctx context.Context, items []FeedVideoItem) int64 {
+	if len(items) == 0 {
+		return 0
+	}
+	last := items[len(items)-1]
+	if cached, ok := f.getFeedReadModel(ctx, last.ID); ok && cached.SortCreateTimeMS > 0 {
+		return cached.SortCreateTimeMS
+	}
+	return last.CreateTime * 1000
 }
