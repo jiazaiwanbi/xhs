@@ -52,10 +52,7 @@ export default function AppShell({
         </Link>
         <nav className="dy-nav">
           <NavLink className="dy-nav-link" to="/">
-            最新
-          </NavLink>
-          <NavLink className="dy-nav-link" to="/hot">
-            热榜
+            首页
           </NavLink>
           <NavLink className="dy-nav-link" to="/video" end>
             发布笔记
@@ -117,10 +114,7 @@ export default function AppShell({
 
         <nav className="dy-mobile-nav">
           <NavLink className="dy-mobile-link" to="/">
-            最新
-          </NavLink>
-          <NavLink className="dy-mobile-link" to="/hot">
-            热榜
+            首页
           </NavLink>
           <NavLink className="dy-mobile-link" to="/video" end>
             发布
