@@ -53,7 +53,7 @@ func (vh *VideoHandler) PublishVideo(c *gin.Context) {
 		CoverURL:    req.CoverURL,
 		CreateTime:  time.Now(),
 	}
-	if err := vh.service.Publish(c.Request.Context(), video); err != nil {
+	if err := vh.service.Publish(c.Request.Context(), video, req.NotifyFollowers); err != nil {
 		c.JSON(apierror.ClassifyHTTPStatus(err), gin.H{"error": err.Error()})
 		return
 	}

@@ -28,6 +28,10 @@ export type ListNotificationsResponse = {
   notifications: NotificationItem[]
 }
 
+export type UnreadCountResponse = {
+  count: number
+}
+
 export type TokenResponse = { token: string; refresh_token?: string; account_id?: number; username?: string }
 
 export type Account = {

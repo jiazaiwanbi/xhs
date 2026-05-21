@@ -11,11 +11,16 @@ import (
 	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/notification"
 	"feedsystem_video_go/internal/readmodel"
 
 	localcache "github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
 )
+
+type NotificationPusher interface {
+	Push(userID uint, n *notification.Notification)
+}
 
 type VideoService struct {
 	repo         *VideoRepository
@@ -23,13 +28,14 @@ type VideoService struct {
 	localcache   *localcache.Cache
 	cacheTTL     time.Duration
 	popularityMQ *rabbitmq.PopularityMQ
+	notifier     NotificationPusher
 }
 
-func NewVideoService(repo *VideoRepository, cache *rediscache.Client, popularityMQ *rabbitmq.PopularityMQ) *VideoService {
-	return &VideoService{repo: repo, cache: cache, localcache: localcache.New(3*time.Second, 5*time.Second), cacheTTL: 5 * time.Minute, popularityMQ: popularityMQ}
+func NewVideoService(repo *VideoRepository, cache *rediscache.Client, popularityMQ *rabbitmq.PopularityMQ, notifier NotificationPusher) *VideoService {
+	return &VideoService{repo: repo, cache: cache, localcache: localcache.New(3*time.Second, 5*time.Second), cacheTTL: 5 * time.Minute, popularityMQ: popularityMQ, notifier: notifier}
 }
 
-func (vs *VideoService) Publish(ctx context.Context, video *Video) error {
+func (vs *VideoService) Publish(ctx context.Context, video *Video, notifyFollowers bool) error {
 	if video == nil {
 		return errors.New("video is nil")
 	}
@@ -46,6 +52,8 @@ func (vs *VideoService) Publish(ctx context.Context, video *Video) error {
 	if video.CoverURL == "" {
 		return errors.New("cover url is required")
 	}
+
+	var pushedNotifications []notification.Notification
 
 	//事务保证视频写入库和消息写入本地消息表的一致性
 	err := vs.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -70,10 +78,53 @@ func (vs *VideoService) Publish(ctx context.Context, video *Video) error {
 			tx.Where("name = ?", tagName).FirstOrCreate(&tag, Tag{Name: tagName})
 			tx.Create(&VideoTag{VideoID: video.ID, TagID: tag.ID})
 		}
-		return nil
+
+		if !notifyFollowers {
+			return nil
+		}
+
+		var followerCount int64
+		if err := tx.Table("socials").Where("vlogger_id = ?", video.AuthorID).Count(&followerCount).Error; err != nil {
+			return err
+		}
+		if followerCount == 0 {
+			return nil
+		}
+
+		content := buildPublishNotificationContent(video.Title)
+		if followerCount > 1000 {
+			return tx.Create(&notification.Broadcast{
+				AuthorID:  video.AuthorID,
+				VideoID:   video.ID,
+				Content:   content,
+				CreatedAt: video.CreateTime,
+			}).Error
+		}
+
+		var followerIDs []uint
+		if err := tx.Table("socials").Where("vlogger_id = ?", video.AuthorID).Order("follower_id ASC").Pluck("follower_id", &followerIDs).Error; err != nil {
+			return err
+		}
+		if len(followerIDs) == 0 {
+			return nil
+		}
+
+		pushedNotifications = make([]notification.Notification, 0, len(followerIDs))
+		for _, followerID := range followerIDs {
+			pushedNotifications = append(pushedNotifications, notification.Notification{
+				RecipientID: followerID,
+				SenderID:    video.AuthorID,
+				Type:        notification.TypePublish,
+				TargetID:    video.ID,
+				Content:     content,
+				CreatedAt:   video.CreateTime,
+			})
+		}
+		return tx.Create(&pushedNotifications).Error
 	})
 	if err == nil {
 		vs.saveFeedReadModel(ctx, video)
+		vs.pushPublishNotifications(pushedNotifications)
 	}
 	return err
 
@@ -295,4 +346,31 @@ func (vs *VideoService) setFeedReadModelLikesCount(ctx context.Context, id uint,
 	cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancel()
 	_ = readmodel.SetFeedVideoLikesCount(cacheCtx, vs.cache, id, likesCount)
+}
+
+func (vs *VideoService) pushPublishNotifications(items []notification.Notification) {
+	if len(items) == 0 {
+		return
+	}
+	for i := range items {
+		cacheCtx, cancel := context.WithTimeout(context.Background(), notification.CacheOpTimeout)
+		_, _ = notification.IncrementUnread(cacheCtx, vs.cache, items[i].RecipientID, 1)
+		cancel()
+		if vs.notifier != nil {
+			copyItem := items[i]
+			vs.notifier.Push(copyItem.RecipientID, &copyItem)
+		}
+	}
+}
+
+func buildPublishNotificationContent(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "发布了新笔记"
+	}
+	runes := []rune(title)
+	if len(runes) > 60 {
+		title = string(runes[:60]) + "..."
+	}
+	return "发布了新笔记：" + title
 }

@@ -31,7 +31,7 @@ function sortNotifications(items: NotificationItem[]) {
 }
 
 function isReplyType(type: string) {
-  return type === 'comment' || type === 'mention'
+  return type === 'comment' || type === 'mention' || type === 'publish'
 }
 
 function isSupportedType(type: string) {
@@ -41,6 +41,7 @@ function isSupportedType(type: string) {
 function toMessage(type: string) {
   if (type === 'like') return '收到一个新赞'
   if (type === 'message') return '收到一条新私信'
+  if (type === 'publish') return '关注的人发布了新笔记'
   if (type === 'mention') return '有人在评论里提到了你'
   return '收到一条新回复'
 }
@@ -52,11 +53,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const clear = useCallback(() => {
     setNotifications([])
     setLoading(false)
     setError('')
+    setUnreadCount(0)
   }, [])
 
   const refresh = useCallback(async () => {
@@ -67,8 +70,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError('')
     try {
-      const res = await notificationApi.listNotifications()
+      const [res, unread] = await Promise.all([notificationApi.listNotifications(), notificationApi.unreadNotificationCount()])
       setNotifications(sortNotifications((res.notifications ?? []).filter((item) => isSupportedType(item.type))))
+      setUnreadCount(Math.max(0, unread.count ?? 0))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e))
     } finally {
@@ -91,6 +95,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             : item,
         ),
       )
+      setUnreadCount((count) => Math.max(0, count - targets.length))
     },
     [notifications],
   )
@@ -108,6 +113,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             : item,
         ),
       )
+      setUnreadCount((count) => Math.max(0, count - targets.length))
     },
     [notifications],
   )
@@ -132,6 +138,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           const deduped = items.filter((item) => item.id !== next.id)
           return sortNotifications([next, ...deduped]).slice(0, 50)
         })
+        if (!next.is_read) setUnreadCount((count) => count + 1)
         toast.info(toMessage(next.type))
       } catch {
         // Ignore malformed SSE payloads.
@@ -151,7 +158,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const likes = notifications.filter((item) => item.type === 'like')
     const replies = notifications.filter((item) => isReplyType(item.type))
     const messages = notifications.filter((item) => item.type === 'message')
-    const unreadCount = notifications.reduce((total, item) => total + (item.is_read ? 0 : 1), 0)
     return {
       notifications,
       likes,
@@ -165,7 +171,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       markCategoryRead,
       markThreadRead,
     }
-  }, [clear, error, loading, markCategoryRead, markThreadRead, notifications, refresh])
+  }, [clear, error, loading, markCategoryRead, markThreadRead, notifications, refresh, unreadCount])
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
 }

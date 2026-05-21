@@ -16,7 +16,12 @@ export default function VideoView() {
   const [busy, setBusy] = useState(false)
   const [stage, setStage] = useState('')
   const [published, setPublished] = useState<Video | null>(null)
-  const [form, setForm] = useState<{ title: string; description: string; cover: File | null }>({ title: '', description: '', cover: null })
+  const [form, setForm] = useState<{ title: string; description: string; cover: File | null; notifyFollowers: boolean }>({
+    title: '',
+    description: '',
+    cover: null,
+    notifyFollowers: false,
+  })
   const [preview, setPreview] = useState('')
 
   useEffect(() => {
@@ -48,9 +53,15 @@ export default function VideoView() {
       const coverUrl = coverRes.url || coverRes.cover_url || ''
       if (!coverUrl) return toast.error('上传成功但缺少图片 URL')
       setStage('发布笔记')
-      const res = await videoApi.publishVideo({ title, description, play_url: coverUrl, cover_url: coverUrl })
+      const res = await videoApi.publishVideo({
+        title,
+        description,
+        play_url: coverUrl,
+        cover_url: coverUrl,
+        notify_followers: form.notifyFollowers,
+      })
       setPublished(res)
-      setForm({ title: '', description: '', cover: null })
+      setForm({ title: '', description: '', cover: null, notifyFollowers: false })
       if (coverInput.current) coverInput.current.value = ''
       toast.success('笔记已发布')
     } catch (e) {
@@ -94,6 +105,15 @@ export default function VideoView() {
                 <img className="cover-preview" src={preview} alt="cover preview" />
               </div>
             ) : null}
+            <label className="row" style={{ gap: 10, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={form.notifyFollowers}
+                disabled={busy}
+                onChange={(e) => setForm((s) => ({ ...s, notifyFollowers: e.target.checked }))}
+              />
+              <span>同时通知粉丝</span>
+            </label>
             <div className="row end">
               <button className="primary big-btn" type="button" disabled={busy} onClick={() => void onPublish()}>
                 发布笔记

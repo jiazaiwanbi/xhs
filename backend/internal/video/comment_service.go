@@ -7,6 +7,7 @@ import (
 	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/rabbitmq"
 	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/notification"
 	"regexp"
 	"strings"
 	"time"
@@ -180,19 +181,17 @@ func (s *CommentService) notifyMentions(ctx context.Context, comment *Comment) {
 		if err := s.repo.db.WithContext(ctx).Table("accounts").Where("username = ?", username).Select("id").Scan(&accID).Error; err != nil || accID == 0 {
 			continue
 		}
-		notif := struct {
-			RecipientID uint
-			SenderID    uint
-			Type        string
-			TargetID    uint
-			Content     string
-		}{
+		notif := notification.Notification{
 			RecipientID: accID,
 			SenderID:    comment.AuthorID,
-			Type:        "mention",
+			Type:        notification.TypeMention,
 			TargetID:    comment.VideoID,
 			Content:     comment.Username + " 在评论中提到了你",
 		}
-		s.repo.db.WithContext(ctx).Table("notifications").Create(&notif)
+		if err := s.repo.db.WithContext(ctx).Create(&notif).Error; err == nil {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), notification.CacheOpTimeout)
+			_, _ = notification.IncrementUnread(cacheCtx, s.cache, accID, 1)
+			cancel()
+		}
 	}
 }

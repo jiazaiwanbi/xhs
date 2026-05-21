@@ -8,7 +8,8 @@ import (
 
 	"feedsystem_video_go/internal/apierror"
 	"feedsystem_video_go/internal/middleware/jwt"
-	"feedsystem_video_go/internal/worker"
+	rediscache "feedsystem_video_go/internal/middleware/redis"
+	"feedsystem_video_go/internal/notification"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,7 @@ import (
 
 type Repository struct{ db *gorm.DB }
 type NotificationPusher interface {
-	Push(userID uint, n *worker.Notification)
+	Push(userID uint, n *notification.Notification)
 }
 type MessagePusher interface {
 	Push(userID uint, msg *Message)
@@ -27,14 +28,15 @@ type Service struct {
 	repo       *Repository
 	notifier   NotificationPusher
 	messageHub MessagePusher
+	cache      *rediscache.Client
 }
 type Handler struct{ service *Service }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
-func NewService(repo *Repository, notifier NotificationPusher, messageHub MessagePusher) *Service {
-	return &Service{repo: repo, notifier: notifier, messageHub: messageHub}
+func NewService(repo *Repository, notifier NotificationPusher, messageHub MessagePusher, cache *rediscache.Client) *Service {
+	return &Service{repo: repo, notifier: notifier, messageHub: messageHub, cache: cache}
 }
-func NewHandler(service *Service) *Handler   { return &Handler{service: service} }
+func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 func (r *Repository) AutoMigrate(ctx context.Context) error {
 	return r.db.WithContext(ctx).AutoMigrate(&Message{})
@@ -78,10 +80,10 @@ func (s *Service) Send(ctx context.Context, m *Message) error {
 	}
 	m.CreatedAt = time.Now()
 
-	notif := &worker.Notification{
+	notif := &notification.Notification{
 		RecipientID: m.ToID,
 		SenderID:    m.FromID,
-		Type:        "message",
+		Type:        notification.TypeMessage,
 		TargetID:    m.FromID,
 		Content:     buildNotificationPreview(m.Content),
 	}
@@ -95,6 +97,9 @@ func (s *Service) Send(ctx context.Context, m *Message) error {
 		return err
 	}
 
+	cacheCtx, cancel := context.WithTimeout(context.Background(), notification.CacheOpTimeout)
+	defer cancel()
+	_, _ = notification.IncrementUnread(cacheCtx, s.cache, notif.RecipientID, 1)
 	if s.notifier != nil {
 		s.notifier.Push(notif.RecipientID, notif)
 	}

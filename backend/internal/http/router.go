@@ -33,6 +33,8 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 	likeLimiter := ratelimit.Limit(cache, "like_write", 30, time.Minute, ratelimit.KeyByAccount)
 	commentLimiter := ratelimit.Limit(cache, "comment_write", 10, time.Minute, ratelimit.KeyByAccount)
 	socialLimiter := ratelimit.Limit(cache, "social_write", 20, time.Minute, ratelimit.KeyByAccount)
+	sseHub := worker.NewSSEHub(db, cache)
+	messageHub := message.NewStreamHub()
 
 	// account
 	accountRepository := account.NewAccountRepository(db)
@@ -62,7 +64,7 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 		log.Printf("PopularityMQ init failed (mq disabled): %v", err)
 		popularityMQ = nil
 	}
-	videoService := video.NewVideoService(videoRepository, cache, popularityMQ)
+	videoService := video.NewVideoService(videoRepository, cache, popularityMQ, sseHub)
 	videoHandler := video.NewVideoHandler(videoService, accountService)
 	videoGroup := r.Group("/video")
 	{
@@ -197,11 +199,9 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 	{
 		protectedFeedGroup.POST("/listByFollowing", feedHandler.ListByFollowing)
 	}
-	sseHub := worker.NewSSEHub(db)
-	messageHub := message.NewStreamHub()
 	// message
 	messageRepo := message.NewRepository(db)
-	messageService := message.NewService(messageRepo, sseHub, messageHub)
+	messageService := message.NewService(messageRepo, sseHub, messageHub, cache)
 	messageHandler := message.NewHandler(messageService)
 	messageGroup := r.Group("/message")
 	protectedMessageGroup := messageGroup.Group("")
@@ -236,19 +236,19 @@ func SetRouter(db *gorm.DB, cache *rediscache.Client, rmq *rabbitmq.RabbitMQ) *g
 			ctx := context.Background()
 			// consume from like queue
 			go func() {
-				w := worker.NewNotificationWorker(rmq.Ch, db, "notification.like", hub)
+				w := worker.NewNotificationWorker(rmq.Ch, db, cache, "notification.like", hub)
 				if err := w.Run(ctx); err != nil {
 					log.Printf("notification-like worker: %v", err)
 				}
 			}()
 			go func() {
-				w := worker.NewNotificationWorker(rmq.Ch, db, "notification.comment", hub)
+				w := worker.NewNotificationWorker(rmq.Ch, db, cache, "notification.comment", hub)
 				if err := w.Run(ctx); err != nil {
 					log.Printf("notification-comment worker: %v", err)
 				}
 			}()
 			go func() {
-				w := worker.NewNotificationWorker(rmq.Ch, db, "notification.social", hub)
+				w := worker.NewNotificationWorker(rmq.Ch, db, cache, "notification.social", hub)
 				if err := w.Run(ctx); err != nil {
 					log.Printf("notification-social worker: %v", err)
 				}

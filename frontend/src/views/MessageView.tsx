@@ -22,6 +22,7 @@ export default function MessageView() {
   const social = useSocial()
   const toast = useToast()
   const listEl = useRef<HTMLDivElement>(null)
+  const inboxBootstrapped = useRef(false)
   const myId = auth.claims?.account_id ?? 0
   const threadId = rawThreadId ?? ''
   const isLikesThread = threadId === 'likes'
@@ -38,7 +39,7 @@ export default function MessageView() {
   const dynamicItems = useMemo(
     () => [
       { key: 'likes', label: '收到的赞', subtitle: '别人赞了你的内容', unread: notifications.likes.filter((item) => !item.is_read).length },
-      { key: 'replies', label: '新回复', subtitle: '评论和提及提醒', unread: notifications.replies.filter((item) => !item.is_read).length },
+      { key: 'replies', label: '新回复', subtitle: '评论、提及和关注动态', unread: notifications.replies.filter((item) => !item.is_read).length },
     ],
     [notifications.likes, notifications.replies],
   )
@@ -117,10 +118,10 @@ export default function MessageView() {
   }
 
   useEffect(() => {
-    if ((!social.followers.length && !social.vloggers.length) || notifications.messages.some((item) => !senderMap[item.sender_id])) {
-      void refreshInbox()
-    }
-  }, [notifications.messages, senderMap, social.followers.length, social.vloggers.length])
+    if (!auth.isLoggedIn || inboxBootstrapped.current) return
+    inboxBootstrapped.current = true
+    void refreshInbox()
+  }, [auth.isLoggedIn])
 
   useEffect(() => {
     if (!isNotificationThread) return
@@ -189,6 +190,7 @@ export default function MessageView() {
 
   function formatNotificationTitle(item: NotificationItem) {
     if (item.type === 'like') return '赞了你的内容'
+    if (item.type === 'publish') return '发布了新笔记'
     if (item.type === 'mention') return '在评论里提到了你'
     return '回复了你'
   }
@@ -241,7 +243,7 @@ export default function MessageView() {
                 <button className="icon-btn" type="button" title="返回" onClick={() => void navigate('/messages')}>‹</button>
                 <div className="peer">
                   <span className={`inbox-icon large ${isLikesThread ? 'likes' : 'replies'}`}>{isLikesThread ? '赞' : '评'}</span>
-                  <span className="peer-meta"><span className="peer-name">{isLikesThread ? '收到的赞' : '新回复'}</span><span className="peer-id">{isLikesThread ? '看看谁给你点赞了' : '评论和提及都会显示在这里'}</span></span>
+                  <span className="peer-meta"><span className="peer-name">{isLikesThread ? '收到的赞' : '新回复'}</span><span className="peer-id">{isLikesThread ? '看看谁给你点赞了' : '评论、提及和关注动态都会显示在这里'}</span></span>
                 </div>
                 <button className="ghost small" type="button" disabled={notifications.loading} onClick={() => void notifications.refresh()}>刷新</button>
               </header>

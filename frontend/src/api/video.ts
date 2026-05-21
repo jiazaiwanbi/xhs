@@ -2,7 +2,7 @@ import { postForm, postJson } from './client'
 import { normalizeVideoList } from './normalize'
 import type { Video } from './types'
 
-export function publishVideo(input: { title: string; description: string; play_url: string; cover_url: string }) {
+export function publishVideo(input: { title: string; description: string; play_url: string; cover_url: string; notify_followers: boolean }) {
   return postJson<Video>('/video/publish', input, { authRequired: true })
 }
 
