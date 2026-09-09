@@ -35,13 +35,6 @@ export default function HomeView() {
     if (tab === 'following' && auth.isLoggedIn && following.items.length === 0) void loadFollowing(true)
   }, [auth.isLoggedIn, following.items.length, loadFollowing, tab])
 
-  const tabCopy =
-    tab === 'following'
-      ? '看看你关注的人最近都在发什么图文内容。'
-      : tab === 'hot'
-        ? '按热度排序，适合展示“爆款图文内容”的效果。'
-        : '最新流按发布时间倒序展示图文笔记，适合快速查看社区刚刚更新的内容。'
-
   async function refreshCurrentTab() {
     if (tab === 'latest') await loadLatest(true)
     else if (tab === 'hot') await loadHot(true)
@@ -63,24 +56,17 @@ export default function HomeView() {
       }}
     >
       <div className="page">
-        <section className="hero">
-          <div>
-            <div className="hero-kicker">图文社区 Demo</div>
-            <h1 className="hero-title">沉浸式浏览最新图文笔记，快速体验小红书风格社区首页</h1>
-            <p className="hero-copy">{tabCopy}</p>
-          </div>
-          <div className="hero-tabs">
-            <button className={`tab ${tab === 'latest' ? 'on' : ''}`} type="button" onClick={() => setTab('latest')}>
-              最新
-            </button>
-            <button className={`tab ${tab === 'following' ? 'on' : ''}`} type="button" onClick={() => setTab('following')}>
-              关注
-            </button>
-            <button className={`tab ${tab === 'hot' ? 'on' : ''}`} type="button" onClick={() => setTab('hot')}>
-              热榜
-            </button>
-          </div>
-        </section>
+        <nav className="feed-tabs-bar" aria-label="内容分类">
+          <button className={`feed-tab ${tab === 'latest' ? 'on' : ''}`} type="button" onClick={() => setTab('latest')}>
+            最新
+          </button>
+          <button className={`feed-tab ${tab === 'following' ? 'on' : ''}`} type="button" onClick={() => setTab('following')}>
+            关注
+          </button>
+          <button className={`feed-tab ${tab === 'hot' ? 'on' : ''}`} type="button" onClick={() => setTab('hot')}>
+            热榜
+          </button>
+        </nav>
 
         <section className="stream-head">
           <div className="subtle">
