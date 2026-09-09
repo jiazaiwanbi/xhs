@@ -54,3 +54,30 @@ func TestIncrementWithExpireSetsTTLWithoutExtendingWindow(t *testing.T) {
 		t.Fatalf("expected ttl to stay at %s, got %s", ttlBeforeSecond, ttlAfterSecond)
 	}
 }
+
+func TestDeletePatternOnlyDeletesMatches(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := &Client{rdb: goredis.NewClient(&goredis.Options{Addr: mr.Addr()}), keyPrefix: defaultKeyPrefix}
+	defer client.Close()
+	ctx := context.Background()
+	for _, key := range []string{"v1:feed:item:1", "v1:feed:global_timeline", "v1:account:1"} {
+		if err := client.SetBytes(ctx, key, []byte("value"), time.Minute); err != nil {
+			t.Fatalf("set %s: %v", key, err)
+		}
+	}
+
+	if err := client.DeletePattern(ctx, client.Key("feed:*")); err != nil {
+		t.Fatalf("DeletePattern: %v", err)
+	}
+	if mr.Exists("v1:feed:item:1") || mr.Exists("v1:feed:global_timeline") {
+		t.Fatal("matching feed keys were not deleted")
+	}
+	if !mr.Exists("v1:account:1") {
+		t.Fatal("non-matching account key was deleted")
+	}
+}

@@ -30,7 +30,20 @@ docker compose up -d --build
 
 ## 测试数据
 
-启动后内置 100 个测试用户（`user001` ~ `user100`，密码均为 `123456`），`user001` 已发布视频并拥有粉丝/点赞数据。
+启动依赖后，可重复执行 seed 工具生成完整 Feed 测试数据：
+
+```bash
+docker compose run --rm seed \
+  --users 100 \
+  --videos 300 \
+  --likes 2000 \
+  --comments 500 \
+  --follows 800
+```
+
+测试用户为 `user001` ~ `user100`，密码均为 `123456`。seed 使用稳定标识和数据库唯一约束，相同参数重复运行不会产生重复数据；每次运行都会重新汇总视频的 `likes_count` / `popularity`，并重建 Redis 最新 Feed、热榜和视频读模型缓存。视频使用 W3C 提供的可公开访问 MP4 与封面素材。
+
+数量参数均可省略，上述数值就是默认值。点赞数不能超过 `users * videos`，关注数不能超过 `users * (users - 1)`。
 
 ## 本地开发
 

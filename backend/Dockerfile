@@ -33,6 +33,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags="-s -w" -o /out/worker ./cmd/worker
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -trimpath -ldflags="-s -w" -o /out/seed ./cmd/seed
 
 FROM alpine:3.21 AS base
 RUN apk add --no-cache ca-certificates tzdata \
@@ -51,3 +54,8 @@ FROM base AS worker
 COPY --from=build --chown=app:app /src/configs ./configs
 COPY --from=build --chown=app:app /out/worker ./worker
 ENTRYPOINT ["/app/worker"]
+
+FROM base AS seed
+COPY --from=build --chown=app:app /src/configs ./configs
+COPY --from=build --chown=app:app /out/seed ./seed
+ENTRYPOINT ["/app/seed"]

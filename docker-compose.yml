@@ -112,6 +112,25 @@ services:
       timeout: 5s
       retries: 3
 
+  seed:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: seed
+    environment:
+      CONFIG_PATH: configs/config.yaml
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-feedsystem}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+    volumes:
+      - ./backend/configs/config.docker.yaml:/app/configs/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend

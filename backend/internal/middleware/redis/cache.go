@@ -17,6 +17,30 @@ func (c *Client) Del(ctx context.Context, key string) error {
 	return c.rdb.Del(ctx, key).Err()
 }
 
+// DeletePattern removes keys matching a namespaced Redis pattern without using
+// KEYS, so it remains safe to run against a non-empty development database.
+func (c *Client) DeletePattern(ctx context.Context, pattern string) error {
+	if c == nil || c.rdb == nil {
+		return nil
+	}
+	var cursor uint64
+	for {
+		keys, next, err := c.rdb.Scan(ctx, cursor, pattern, 200).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := c.rdb.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			return nil
+		}
+	}
+}
+
 func (c *Client) MGet(cacheCtx context.Context, cacheKeys ...string) ([]interface{}, error) {
 	return c.rdb.MGet(cacheCtx, cacheKeys...).Result()
 }
