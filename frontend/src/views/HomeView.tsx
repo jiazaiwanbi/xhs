@@ -56,23 +56,23 @@ export default function HomeView() {
       }}
     >
       <div className="page">
-        <nav className="feed-tabs-bar" aria-label="内容分类">
+        <nav id="feed" className="feed-tabs-bar" aria-label="内容分类">
           <button className={`feed-tab ${tab === 'latest' ? 'on' : ''}`} type="button" onClick={() => setTab('latest')}>
-            最新
+            推荐
           </button>
           <button className={`feed-tab ${tab === 'following' ? 'on' : ''}`} type="button" onClick={() => setTab('following')}>
             关注
           </button>
           <button className={`feed-tab ${tab === 'hot' ? 'on' : ''}`} type="button" onClick={() => setTab('hot')}>
-            热榜
+            热门
           </button>
         </nav>
 
-        <section className="stream-head">
+        <section className="stream-head" aria-live="polite">
           <div className="subtle">
             当前共 {filteredItems.length} 条{q ? '匹配到的' : ''}笔记{q ? ` · 搜索词：${q}` : ''}
           </div>
-          <div className="row">
+          <div className="row stream-tools">
             <button className="chip-btn" type="button" disabled={currentState.loading} onClick={() => void refreshCurrentTab()}>
               刷新
             </button>

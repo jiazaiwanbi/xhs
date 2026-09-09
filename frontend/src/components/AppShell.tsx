@@ -5,6 +5,7 @@ import { useAuth } from '../stores/auth'
 import { useNotification } from '../stores/notification'
 import { useSocial } from '../stores/social'
 import Toaster from './Toaster'
+import Icon from './Icon'
 
 export default function AppShell({
   full = false,
@@ -48,68 +49,48 @@ export default function AppShell({
     <div className="dy-shell">
       <aside className="dy-aside">
         <Link className="dy-logo" to="/">
-          RedNote Demo
+          内容社区
         </Link>
         <nav className="dy-nav">
           <NavLink className="dy-nav-link" to="/">
-            首页
+            <Icon name="home" /><span>发现</span>
           </NavLink>
           <NavLink className="dy-nav-link" to="/video" end>
-            发布笔记
+            <Icon name="camera" /><span>发布</span>
+          </NavLink>
+          <NavLink className="dy-nav-link" to="/messages">
+            <Icon name="bell" /><span>通知</span>{auth.isLoggedIn && notifications.unreadCount > 0 ? <b className="dy-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</b> : null}
+          </NavLink>
+          <NavLink className="dy-nav-link" to="/messages">
+            <Icon name="message" /><span>消息</span>
           </NavLink>
           <NavLink className="dy-nav-link" to="/account">
-            账号
-          </NavLink>
-          {auth.isLoggedIn ? (
-            <NavLink className="dy-nav-link" to="/messages">
-              消息
-            </NavLink>
-          ) : null}
-          <NavLink className="dy-nav-link" to="/settings">
-            设置
+            <Icon name="user" /><span>我的</span>
           </NavLink>
         </nav>
         <div className="dy-aside-foot">
-          <div className="dy-user">
-            <span className={`dy-user-dot ${auth.isLoggedIn ? 'ok' : 'bad'}`} />
-            <span className="dy-user-name">{userLabel}</span>
-          </div>
-          <button className="dy-btn dy-btn-primary" type="button" onClick={() => void navigate(auth.isLoggedIn ? '/settings' : '/account')}>
-            {auth.isLoggedIn ? '设置' : '登录'}
+          <button className="dy-btn dy-btn-primary" type="button" onClick={() => void navigate('/account')}>
+            {auth.isLoggedIn ? userLabel : '登录'}
           </button>
         </div>
       </aside>
 
       <div className="dy-main">
         <header className="dy-topbar">
-          <div className="dy-top-left">
-            <div className="dy-tabs-hint">{location.pathname}</div>
-          </div>
+          <div className="dy-top-left" />
           <div className="dy-search">
             <input
               value={search}
               className="dy-search-input"
-              placeholder="搜索标题 / 作者 / 文案（本地过滤）"
+              placeholder="登录探索更多内容"
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onSearch()
               }}
             />
-            <button className="dy-btn dy-btn-primary" type="button" onClick={onSearch}>
-              搜索
-            </button>
+            <button className="search-button" type="button" onClick={onSearch} aria-label="搜索"><Icon name="search" /></button>
           </div>
-          <div className="dy-top-right">
-            {auth.isLoggedIn ? (
-              <Link className="dy-btn dy-btn-ghost dy-bell-btn" to="/messages">
-                <span>铃铛</span>
-                {notifications.unreadCount > 0 ? <b className="dy-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</b> : null}
-              </Link>
-            ) : null}
-            <Link className="dy-btn dy-btn-ghost" to="/video">
-              + 发布笔记
-            </Link>
-          </div>
+          <div className="dy-top-right" />
         </header>
 
         <nav className="dy-mobile-nav">

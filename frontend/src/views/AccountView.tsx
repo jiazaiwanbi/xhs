@@ -8,6 +8,7 @@ import type { Account, Video } from '../api/types'
 import * as videoApi from '../api/video'
 import AppShell from '../components/AppShell'
 import UserAvatar from '../components/UserAvatar'
+import Icon from '../components/Icon'
 import { useAuth } from '../stores/auth'
 import { useSocial } from '../stores/social'
 import { useToast } from '../stores/toast'
@@ -22,6 +23,7 @@ export default function AccountView() {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
+  const [profile, setProfile] = useState<Account | null>(null)
   const [myVideos, setMyVideos] = useState({ loading: false, error: '', items: [] as Video[] })
   const [likedVideos, setLikedVideos] = useState({ loading: false, loaded: false, error: '', items: [] as Video[] })
   const [videoTab, setVideoTab] = useState<VideoTab>('works')
@@ -32,8 +34,9 @@ export default function AccountView() {
     if (!auth.isLoggedIn || !me.id) return setMyVideos({ loading: false, error: '', items: [] })
     setMyVideos((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const items = await videoApi.listByAuthorId(me.id)
+      const [items, user] = await Promise.all([videoApi.listByAuthorId(me.id), accountApi.findById(me.id)])
       setMyVideos({ loading: false, error: '', items })
+      setProfile(user)
     } catch (e) {
       setMyVideos({ loading: false, error: e instanceof ApiError ? e.message : String(e), items: [] })
     }
@@ -73,84 +76,88 @@ export default function AccountView() {
     if (!auth.isLoggedIn) {
       setDrawer({ open: false, tab: 'followers' })
       setVideoTab('works')
+      setProfile(null)
       setMyVideos({ loading: false, error: '', items: [] })
       setLikedVideos({ loading: false, loaded: false, error: '', items: [] })
     }
   }, [auth.isLoggedIn, me.id])
+
+  useEffect(() => {
+    if (auth.isLoggedIn) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') void navigate('/')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [auth.isLoggedIn, navigate])
 
   const listTitle = drawer.tab === 'followers' ? '粉丝' : '关注'
   const listItems: Account[] = drawer.tab === 'followers' ? social.followers : social.vloggers
   const drawerLoading = drawer.tab === 'followers' ? social.followersLoading : social.vloggersLoading
   const drawerError = drawer.tab === 'followers' ? social.followersError : social.vloggersError
   const socialErrorHint = social.followersError || social.vloggersError
+  const receivedLikes = myVideos.items.reduce((total, item) => total + item.likes_count, 0)
 
   return (
     <AppShell>
       {!auth.isLoggedIn ? (
-        <div className="login-wrap">
-          <div className="card login-card">
-            <p className="title">登录</p>
-            <div className="grid spaced">
-              <label>username</label>
-              <input value={loginForm.username} autoComplete="username" onChange={(e) => setLoginForm((s) => ({ ...s, username: e.target.value.trim() }))} />
-              <label>password</label>
+        <div className="login-wrap" role="dialog" aria-modal="true" aria-label="登录">
+          <div className="login-card">
+            <button className="login-close" type="button" onClick={() => void navigate('/')} aria-label="关闭"><Icon name="close" /></button>
+            <section className="login-brand">
+              <div className="login-logo">内容社区</div>
+              <h2>发现真实、有趣的生活</h2>
+              <div className="login-orbit"><span>穿搭</span><span>美食</span><span>旅行</span><span>灵感</span></div>
+              <p>分享和发现生活里的每一个闪光时刻</p>
+            </section>
+            <section className="login-form-panel">
+              <h1>账号登录</h1>
+              <p className="login-lead">登录后即可点赞、评论与关注喜欢的创作者</p>
+              <label className="sr-only" htmlFor="login-username">用户名</label>
+              <input id="login-username" value={loginForm.username} placeholder="输入用户名" autoComplete="username" onChange={(e) => setLoginForm((s) => ({ ...s, username: e.target.value.trim() }))} />
+              <label className="sr-only" htmlFor="login-password">密码</label>
               <input
+                id="login-password"
                 value={loginForm.password}
                 type="password"
+                placeholder="输入密码"
                 autoComplete="current-password"
                 onChange={(e) => setLoginForm((s) => ({ ...s, password: e.target.value.trim() }))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void onLogin()
                 }}
               />
-              <button className="primary" type="button" disabled={busy} onClick={() => void onLogin()}>
-                登录
-              </button>
-            </div>
-            <div className="row spread spaced">
-              <button className="ghost" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>
-                注册账号
-              </button>
-            </div>
+              <button className="login-submit" type="button" disabled={busy} onClick={() => void onLogin()}>{busy ? '登录中…' : '登录'}</button>
+              <p className="login-agreement">登录即代表同意《用户协议》和《隐私政策》</p>
+              <button className="login-register" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>新用户注册</button>
+            </section>
           </div>
         </div>
       ) : (
-        <>
-          <div className="card">
-            <div className="row spread start">
-              <div className="row avatar-head">
-                <UserAvatar username={me.username} id={me.id} size={64} />
-                <div>
-                  <div className="title">@{me.username}</div>
-                  <div className="subtle mono">#{me.id}</div>
-                </div>
+        <main className="profile-page">
+          <section className="profile-hero">
+            <UserAvatar username={profile?.username ?? me.username} id={me.id} src={profile?.avatar_url} size={176} />
+            <div className="profile-info">
+              <div className="profile-title-row">
+                <h1>{profile?.username ?? me.username}</h1>
+                <button className="profile-settings" type="button" onClick={() => void navigate('/settings')}>编辑资料</button>
               </div>
-              <button className="ghost" type="button" onClick={() => void navigate('/settings')}>
-                设置
-              </button>
-            </div>
-            <div className="row spaced">
-              <button className="metric" type="button" disabled={social.followersLoading} onClick={() => setDrawer({ open: true, tab: 'followers' })}>
-                <div className="metric-num">{social.followersLoading ? '...' : social.followerCount}</div>
-                <div className="metric-label">粉丝</div>
-              </button>
-              <button className="metric" type="button" disabled={social.vloggersLoading} onClick={() => setDrawer({ open: true, tab: 'following' })}>
-                <div className="metric-num">{social.vloggersLoading ? '...' : social.followingCount}</div>
-                <div className="metric-label">关注</div>
-              </button>
-              <button className={`metric ${videoTab === 'works' ? 'active' : ''}`} type="button" onClick={() => { setVideoTab('works'); void loadMyVideos() }}>
-                <div className="metric-num">{myVideos.loading ? '...' : myVideos.items.length}</div>
-                <div className="metric-label">笔记</div>
-              </button>
-              <button className={`metric ${videoTab === 'likes' ? 'active' : ''}`} type="button" onClick={() => { setVideoTab('likes'); void loadLikedVideos() }}>
-                <div className="metric-num">{likedVideos.loading ? '...' : likedVideos.loaded ? likedVideos.items.length : '-'}</div>
-                <div className="metric-label">赞过</div>
-              </button>
+              <div className="profile-id">账号 ID：{me.id}</div>
+              <p className={`profile-bio ${profile?.bio ? '' : 'empty'}`}>{profile?.bio || '还没有简介'}</p>
+              <div className="profile-stats">
+                <button type="button" disabled={social.vloggersLoading} onClick={() => setDrawer({ open: true, tab: 'following' })}><b>{social.vloggersLoading ? '…' : social.followingCount}</b><span>关注</span></button>
+                <button type="button" disabled={social.followersLoading} onClick={() => setDrawer({ open: true, tab: 'followers' })}><b>{social.followersLoading ? '…' : social.followerCount}</b><span>粉丝</span></button>
+                <div><b>{receivedLikes}</b><span>获赞</span></div>
+              </div>
               {socialErrorHint ? <div className="subtle">社交信息加载失败：{socialErrorHint}</div> : null}
             </div>
-          </div>
-          <VideoGrid title={videoTab === 'works' ? '我的笔记' : '赞过的笔记'} loading={videoTab === 'works' ? myVideos.loading : likedVideos.loading} error={videoTab === 'works' ? myVideos.error : likedVideos.error} items={videoTab === 'works' ? myVideos.items : likedVideos.items} empty={videoTab === 'works' ? '还没有发布笔记' : '还没有收藏喜欢的笔记'} />
-        </>
+          </section>
+          <nav className="profile-tabs" aria-label="个人内容">
+            <button className={videoTab === 'works' ? 'active' : ''} type="button" onClick={() => { setVideoTab('works'); void loadMyVideos() }}>发布的内容</button>
+            <button className={videoTab === 'likes' ? 'active' : ''} type="button" onClick={() => { setVideoTab('likes'); void loadLikedVideos() }}>喜欢过的内容</button>
+          </nav>
+          <VideoGrid loading={videoTab === 'works' ? myVideos.loading : likedVideos.loading} error={videoTab === 'works' ? myVideos.error : likedVideos.error} items={videoTab === 'works' ? myVideos.items : likedVideos.items} empty={videoTab === 'works' ? '你还没有发布任何内容' : '你还没有喜欢过任何内容'} />
+        </main>
       )}
       {drawer.open ? (
         <UserDrawer title={listTitle} items={listItems} loading={drawerLoading} error={drawerError} onClose={() => setDrawer((s) => ({ ...s, open: false }))} onUser={(id) => { setDrawer((s) => ({ ...s, open: false })); void navigate(`/u/${id}`) }} />
@@ -159,17 +166,13 @@ export default function AccountView() {
   )
 }
 
-function VideoGrid({ title, loading, error, items, empty }: { title: string; loading: boolean; error: string; items: Video[]; empty: string }) {
+function VideoGrid({ loading, error, items, empty }: { loading: boolean; error: string; items: Video[]; empty: string }) {
   const navigate = useNavigate()
   return (
-    <div className="card spaced">
-      <div className="row spread">
-        <p className="title">{title}</p>
-        <div className="subtle">点击封面进入笔记详情</div>
-      </div>
+    <section className="profile-content">
       {loading ? <div className="hint spaced">加载中...</div> : null}
       {error ? <div className="hint bad spaced">{error}</div> : null}
-      {!loading && !error && items.length === 0 ? <div className="hint spaced">{empty}</div> : null}
+      {!loading && !error && items.length === 0 ? <div className="profile-empty"><div className="profile-empty-icon">⌁</div><p>{empty}</p></div> : null}
       {items.length ? (
         <div className="video-grid spaced">
           {items.map((v) => (
@@ -183,7 +186,7 @@ function VideoGrid({ title, loading, error, items, empty }: { title: string; loa
           ))}
         </div>
       ) : null}
-    </div>
+    </section>
   )
 }
 

@@ -75,10 +75,6 @@ export default function SettingsView() {
             <div className="row"><button className="ghost" type="button" disabled={busy} onClick={() => void navigate('/account/change-password')}>修改密码</button><button className="danger" type="button" disabled={busy} onClick={() => void onLogout()}>退出登录</button></div>
           </div>
         </div>
-        <div className="card">
-          <p className="title">说明</p>
-          <div className="grid spaced"><div className="pill ok">改名后会返回新 token，旧 token 立即失效</div><div className="pill ok">退出登录会清空本地 token</div><div className="pill">修改密码无需登录，但成功后会让旧 token 失效</div></div>
-        </div>
       </div>
     </AppShell>
   )

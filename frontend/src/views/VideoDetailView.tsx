@@ -8,6 +8,7 @@ import type { Comment, Video } from '../api/types'
 import * as videoApi from '../api/video'
 import AppShell from '../components/AppShell'
 import UserAvatar from '../components/UserAvatar'
+import Icon from '../components/Icon'
 import { useAuth } from '../stores/auth'
 import { useSocial } from '../stores/social'
 import { useToast } from '../stores/toast'
@@ -148,17 +149,25 @@ export default function VideoDetailView() {
     void loadIsLiked()
   }, [auth.isLoggedIn])
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') void navigate('/')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [navigate])
+
   const video = state.video
   return (
     <AppShell full>
-      <div className="detail-page">
+      <div className="detail-page" role="dialog" aria-modal="true" aria-label="笔记详情" onMouseDown={(event) => event.currentTarget === event.target && void navigate('/')}>
+        <button className="detail-close" type="button" onClick={() => void navigate('/')} aria-label="关闭"><Icon name="close" size={28} /></button>
         {state.loading ? <div className="center-hint">加载中...</div> : null}
         {state.error ? <div className="center-hint bad">{state.error}</div> : null}
         {video ? (
           <div className="note-reader">
             <section className="media-panel">
-              <Link className="back-link" to="/">← 返回最新</Link>
-              <img className="note-cover" src={video.cover_url || video.play_url} alt={video.title} />
+              <video className="note-cover" src={video.play_url} poster={video.cover_url} controls playsInline aria-label={video.title} />
             </section>
             <aside className="detail-panel">
               <section className="note-info">
@@ -178,15 +187,13 @@ export default function VideoDetailView() {
                   {video.description ? <p className="desc">{video.description}</p> : null}
                   <div className="meta-line">
                     <span>{new Date(video.create_time).toLocaleString()}</span>
-                    <span>笔记 ID {video.id}</span>
-                    <a href={video.cover_url || video.play_url} target="_blank" rel="noreferrer">查看原图</a>
+                    <span>编辑于 {new Date(video.create_time).toLocaleDateString()}</span>
                   </div>
                 </div>
               </section>
               <section className="comment-panel">
                 <div className="comment-title">
                   <span>共 {comments.list.length} 条评论</span>
-                  <button className="text-btn" type="button" disabled={comments.loading} onClick={() => void loadComments()}>刷新</button>
                 </div>
                 <div className="comment-composer">
                   <textarea
@@ -223,9 +230,9 @@ export default function VideoDetailView() {
               </section>
               <footer className="action-bar">
                 <div className="quick-actions">
-                  <button className="icon-btn" type="button" disabled={state.busy} onClick={() => void toggleLike()}><span className={state.isLiked ? 'liked' : ''}>♡</span><b>{video.likes_count}</b></button>
-                  <button className="icon-btn" type="button"><span>◎</span><b>{comments.list.length}</b></button>
-                  <button className="icon-btn" type="button" onClick={() => void share()}><span>↗</span><b>分享</b></button>
+                  <button className="icon-btn" type="button" disabled={state.busy} onClick={() => void toggleLike()}><Icon name="heart" size={28} filled={!!state.isLiked} /><b>{video.likes_count}</b></button>
+                  <button className="icon-btn" type="button"><Icon name="message" size={28} /><b>{comments.list.length}</b></button>
+                  <button className="icon-btn" type="button" onClick={() => void share()}><Icon name="share" size={28} /><b>分享</b></button>
                 </div>
               </footer>
             </aside>
