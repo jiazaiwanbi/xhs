@@ -39,18 +39,15 @@ type Result struct {
 }
 
 type media struct {
-	playURL  string
-	coverURL string
+	playURL string
 }
 
 var mediaLibrary = []media{
 	{
-		playURL:  "https://media.w3.org/2010/05/sintel/trailer.mp4",
-		coverURL: "https://media.w3.org/2010/05/sintel/poster.png",
+		playURL: "https://media.w3.org/2010/05/sintel/trailer.mp4",
 	},
 	{
-		playURL:  "https://media.w3.org/2010/05/bunny/trailer.mp4",
-		coverURL: "https://media.w3.org/2010/05/bunny/poster.png",
+		playURL: "https://media.w3.org/2010/05/bunny/trailer.mp4",
 	},
 }
 
@@ -70,6 +67,9 @@ func (o Options) Validate() error {
 	if int64(o.Follows) > int64(o.Users)*int64(max(o.Users-1, 0)) {
 		return fmt.Errorf("follows exceeds the maximum of users * (users - 1) (%d)", o.Users*max(o.Users-1, 0))
 	}
+	if o.Videos > len(coverAssetIDs) {
+		return fmt.Errorf("videos exceeds the %d unique seed covers available", len(coverAssetIDs))
+	}
 	return nil
 }
 
@@ -87,6 +87,9 @@ func Run(ctx context.Context, database *gorm.DB, cache *rediscache.Client, opts 
 	if err != nil {
 		return Result{}, fmt.Errorf("hash seed password: %w", err)
 	}
+	coverCtx, cancelCoverDownloads := context.WithTimeout(ctx, 90*time.Second)
+	coverURLs := prepareCoverURLs(coverCtx, opts.Videos)
+	cancelCoverDownloads()
 
 	var seededVideos []video.Video
 	err = database.WithContext(ctx).Connection(func(conn *gorm.DB) error {
@@ -104,7 +107,7 @@ func Run(ctx context.Context, database *gorm.DB, cache *rediscache.Client, opts 
 			if err != nil {
 				return err
 			}
-			seededVideos, err = upsertVideos(tx, opts.Videos, users)
+			seededVideos, err = upsertVideos(tx, opts.Videos, users, coverURLs)
 			if err != nil {
 				return err
 			}
@@ -168,7 +171,7 @@ func upsertUsers(tx *gorm.DB, count int, passwordHash string) ([]account.Account
 	return users, nil
 }
 
-func upsertVideos(tx *gorm.DB, count int, users []account.Account) ([]video.Video, error) {
+func upsertVideos(tx *gorm.DB, count int, users []account.Account, coverURLs []string) ([]video.Video, error) {
 	for i := 1; i <= count; i++ {
 		author := users[(i-1)%len(users)]
 		asset := mediaLibrary[(i-1)%len(mediaLibrary)]
@@ -179,7 +182,7 @@ func upsertVideos(tx *gorm.DB, count int, users []account.Account) ([]video.Vide
 			Title:       title,
 			Description: fmt.Sprintf("可重复生成的 Feed 测试数据 #%s #seed", []string{"旅行", "生活", "技术", "美食"}[(i-1)%4]),
 			PlayURL:     asset.playURL,
-			CoverURL:    asset.coverURL,
+			CoverURL:    coverURLs[i-1],
 			CreateTime:  time.Now().Add(-time.Duration(count-i) * 3 * time.Minute).Truncate(time.Millisecond),
 		}
 		var existing video.Video

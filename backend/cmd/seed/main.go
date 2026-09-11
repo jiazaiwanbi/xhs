@@ -48,7 +48,7 @@ func main() {
 		log.Fatalf("configure Redis: %v", err)
 	}
 	defer cache.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := cache.Ping(ctx); err != nil {
 		log.Fatalf("connect Redis: %v", err)

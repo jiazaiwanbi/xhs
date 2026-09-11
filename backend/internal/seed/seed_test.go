@@ -1,6 +1,12 @@
 package seed
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestOptionsValidate(t *testing.T) {
 	tests := []struct {
@@ -36,5 +42,42 @@ func TestSeedNaturalKeysAreStable(t *testing.T) {
 	titles := seedVideoTitles(2)
 	if titles[0] != "[seed:0001] Feed 测试视频 0001" || titles[1] != "[seed:0002] Feed 测试视频 0002" {
 		t.Fatalf("unexpected video titles: %v", titles)
+	}
+}
+
+func TestCoverAssetIDsAreUnique(t *testing.T) {
+	if len(coverAssetIDs) != 300 {
+		t.Fatalf("expected 300 cover IDs, got %d", len(coverAssetIDs))
+	}
+	seen := make(map[string]struct{}, len(coverAssetIDs))
+	for _, id := range coverAssetIDs {
+		if _, exists := seen[id]; exists {
+			t.Fatalf("duplicate cover ID %q", id)
+		}
+		seen[id] = struct{}{}
+	}
+}
+
+func TestDownloadCoverOnceWritesValidatedWebP(t *testing.T) {
+	webp := []byte("RIFF\x04\x00\x00\x00WEBPtest")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write(webp)
+	}))
+	defer server.Close()
+
+	destination := filepath.Join(t.TempDir(), "cover.webp")
+	if err := downloadCoverOnce(t.Context(), server.Client(), server.URL, destination); err != nil {
+		t.Fatalf("downloadCoverOnce: %v", err)
+	}
+	if !isValidWebP(destination) {
+		t.Fatal("downloaded cover did not pass WebP validation")
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(webp) {
+		t.Fatalf("downloaded bytes = %q, want %q", got, webp)
 	}
 }
