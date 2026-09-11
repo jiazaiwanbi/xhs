@@ -14,12 +14,13 @@ func TestOptionsValidate(t *testing.T) {
 		opts    Options
 		wantErr bool
 	}{
-		{name: "defaults", opts: Options{Users: 100, Videos: 300, Likes: 2000, Comments: 500, Follows: 800}},
+		{name: "defaults", opts: Options{Users: 100, Videos: 300, Images: 240, Likes: 2000, Comments: 500, Follows: 800}},
 		{name: "all zero", opts: Options{}},
 		{name: "negative", opts: Options{Users: -1}, wantErr: true},
 		{name: "video without user", opts: Options{Videos: 1}, wantErr: true},
 		{name: "like without video", opts: Options{Users: 1, Likes: 1}, wantErr: true},
 		{name: "too many likes", opts: Options{Users: 2, Videos: 2, Likes: 5}, wantErr: true},
+		{name: "too many images", opts: Options{Users: 2, Videos: 2, Images: 3}, wantErr: true},
 		{name: "self follow excluded", opts: Options{Users: 1, Follows: 1}, wantErr: true},
 		{name: "maximum relationships", opts: Options{Users: 3, Videos: 2, Likes: 6, Follows: 6}},
 	}
@@ -39,9 +40,39 @@ func TestSeedNaturalKeysAreStable(t *testing.T) {
 	if users[0] != "user001" || users[1] != "user002" {
 		t.Fatalf("unexpected usernames: %v", users)
 	}
-	titles := seedVideoTitles(2)
-	if titles[0] != "[seed:0001] Feed 测试视频 0001" || titles[1] != "[seed:0002] Feed 测试视频 0002" {
-		t.Fatalf("unexpected video titles: %v", titles)
+	keys := seedKeys(2)
+	if keys[0] != "note-0001" || keys[1] != "note-0002" {
+		t.Fatalf("unexpected seed keys: %v", keys)
+	}
+}
+
+func TestSeedTitlesAreUniqueForDefaultMix(t *testing.T) {
+	seen := make(map[string]struct{}, 300)
+	for i := 1; i <= 300; i++ {
+		isImage := isSeedImageNote(i, 300, 240)
+		title := buildSeedTitle(seedContentTypeOrdinal(i, 300, 240, isImage), isImage)
+		if _, exists := seen[title]; exists {
+			t.Fatalf("duplicate title %q at index %d", title, i)
+		}
+		seen[title] = struct{}{}
+	}
+}
+
+func TestSeedImageNotesAreEvenlyDistributed(t *testing.T) {
+	images := 0
+	videosInLastTen := 0
+	for i := 1; i <= 300; i++ {
+		if isSeedImageNote(i, 300, 240) {
+			images++
+		} else if i > 290 {
+			videosInLastTen++
+		}
+	}
+	if images != 240 {
+		t.Fatalf("image count = %d, want 240", images)
+	}
+	if videosInLastTen == 0 || videosInLastTen == 10 {
+		t.Fatalf("latest ten notes are not mixed, video count = %d", videosInLastTen)
 	}
 }
 

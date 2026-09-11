@@ -538,7 +538,7 @@ func (f *FeedService) buildFeedVideos(ctx context.Context, videos []*video.Video
 		return nil, err
 	}
 	for _, video := range videos {
-		readItem := readmodel.NewFeedVideoItem(video.ID, video.AuthorID, video.Username, video.Title, video.Description, video.PlayURL, video.CoverURL, video.CreateTime, video.LikesCount, video.Popularity)
+		readItem := readmodel.NewFeedVideoItem(video.ID, video.AuthorID, video.Username, video.Title, video.Description, video.PlayURL, video.CoverURL, video.ContentType, video.ImageURLs, video.CreateTime, video.LikesCount, video.Popularity)
 		item := feedItemFromReadModel(readItem)
 		item.IsLiked = likedMap[video.ID]
 		feedVideos = append(feedVideos, item)
@@ -635,7 +635,7 @@ func (f *FeedService) GetFeedItemsByIDs(ctx context.Context, ids []uint, viewerA
 			if v == nil {
 				continue
 			}
-			item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.CreateTime, v.LikesCount, v.Popularity)
+			item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.ContentType, v.ImageURLs, v.CreateTime, v.LikesCount, v.Popularity)
 			itemMap[v.ID] = item
 			f.setFeedReadModel(ctx, item)
 		}
@@ -713,10 +713,22 @@ func feedItemFromReadModel(item readmodel.FeedVideoItem) FeedVideoItem {
 		Description: item.Description,
 		PlayURL:     item.PlayURL,
 		CoverURL:    item.CoverURL,
+		ContentType: normalizedContentType(item.ContentType, item.PlayURL, item.CoverURL, item.ImageURLs),
+		ImageURLs:   item.ImageURLs,
 		CreateTime:  item.CreateTime,
 		LikesCount:  item.LikesCount,
 		IsLiked:     item.IsLiked,
 	}
+}
+
+func normalizedContentType(contentType, playURL, coverURL string, imageURLs []string) string {
+	if contentType == video.ContentTypeImage || contentType == video.ContentTypeVideo {
+		return contentType
+	}
+	if len(imageURLs) > 0 || (playURL != "" && playURL == coverURL) {
+		return video.ContentTypeImage
+	}
+	return video.ContentTypeVideo
 }
 
 func (f *FeedService) feedCursorMillis(ctx context.Context, items []FeedVideoItem) int64 {

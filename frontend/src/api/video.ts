@@ -1,8 +1,8 @@
 import { postForm, postJson } from './client'
-import { normalizeVideoList } from './normalize'
+import { normalizeVideo, normalizeVideoList } from './normalize'
 import type { Video } from './types'
 
-export function publishVideo(input: { title: string; description: string; play_url: string; cover_url: string; notify_followers: boolean }) {
+export function publishVideo(input: { title: string; description: string; content_type: 'image' | 'video'; play_url: string; cover_url: string; image_urls?: string[]; notify_followers: boolean }) {
   return postJson<Video>('/video/publish', input, { authRequired: true })
 }
 
@@ -25,6 +25,6 @@ export async function listByAuthorId(authorId: number) {
   return normalizeVideoList(videos)
 }
 
-export function getDetail(id: number) {
-  return postJson<Video>('/video/getDetail', { id })
+export async function getDetail(id: number) {
+  return normalizeVideo(await postJson<Video>('/video/getDetail', { id }))
 }

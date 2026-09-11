@@ -14,6 +14,8 @@ type FeedVideoItem struct {
 	Description string     `json:"description,omitempty"`
 	PlayURL     string     `json:"play_url"`
 	CoverURL    string     `json:"cover_url"`
+	ContentType string     `json:"content_type"`
+	ImageURLs   []string   `json:"image_urls,omitempty"`
 	CreateTime  int64      `json:"create_time"`
 	LikesCount  int64      `json:"likes_count"`
 	IsLiked     bool       `json:"is_liked"`

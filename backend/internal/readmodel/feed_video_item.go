@@ -22,6 +22,8 @@ type FeedVideoItem struct {
 	Description      string     `json:"description,omitempty"`
 	PlayURL          string     `json:"play_url"`
 	CoverURL         string     `json:"cover_url"`
+	ContentType      string     `json:"content_type"`
+	ImageURLs        []string   `json:"image_urls,omitempty"`
 	CreateTime       int64      `json:"create_time"`
 	LikesCount       int64      `json:"likes_count"`
 	IsLiked          bool       `json:"is_liked"`
@@ -33,7 +35,7 @@ func FeedVideoItemKey(cache *rediscache.Client, id uint) string {
 	return cache.Key("feed:item:%d", id)
 }
 
-func NewFeedVideoItem(id uint, authorID uint, username string, title string, description string, playURL string, coverURL string, createTime time.Time, likesCount int64, popularity int64) FeedVideoItem {
+func NewFeedVideoItem(id uint, authorID uint, username string, title string, description string, playURL string, coverURL string, contentType string, imageURLs []string, createTime time.Time, likesCount int64, popularity int64) FeedVideoItem {
 	return FeedVideoItem{
 		ID:               id,
 		Author:           FeedAuthor{ID: authorID, Username: username},
@@ -41,6 +43,8 @@ func NewFeedVideoItem(id uint, authorID uint, username string, title string, des
 		Description:      description,
 		PlayURL:          playURL,
 		CoverURL:         coverURL,
+		ContentType:      contentType,
+		ImageURLs:        imageURLs,
 		CreateTime:       createTime.Unix(),
 		LikesCount:       likesCount,
 		IsLiked:          false,

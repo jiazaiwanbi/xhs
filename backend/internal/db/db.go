@@ -26,11 +26,19 @@ func NewDB(dbcfg config.DatabaseConfig) (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&account.Account{}, &video.Video{}, &video.Like{}, &video.Comment{},
 		&social.Social{}, &video.OutboxMsg{}, &video.Tag{}, &video.VideoTag{},
 		&message.Message{}, &notification.Notification{}, &notification.Broadcast{},
-	)
+	); err != nil {
+		return err
+	}
+	// Older image notes used play_url == cover_url because content types did not
+	// exist yet. Preserve them as real image notes during the schema upgrade.
+	return db.Exec(`UPDATE videos
+		SET content_type = ?, image_urls = JSON_ARRAY(cover_url), play_url = ''
+		WHERE content_type = ? AND play_url <> '' AND play_url = cover_url`,
+		video.ContentTypeImage, video.ContentTypeVideo).Error
 }
 
 func CloseDB(db *gorm.DB) error {

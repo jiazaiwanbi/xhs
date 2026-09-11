@@ -42,15 +42,13 @@ func (vs *VideoService) Publish(ctx context.Context, video *Video, notifyFollowe
 	video.Title = strings.TrimSpace(video.Title)
 	video.PlayURL = strings.TrimSpace(video.PlayURL)
 	video.CoverURL = strings.TrimSpace(video.CoverURL)
+	video.ContentType = strings.ToLower(strings.TrimSpace(video.ContentType))
 
 	if video.Title == "" {
 		return errors.New("title is required")
 	}
-	if video.PlayURL == "" {
-		return errors.New("play url is required")
-	}
-	if video.CoverURL == "" {
-		return errors.New("cover url is required")
+	if err := normalizePublishedContent(video); err != nil {
+		return err
 	}
 
 	var pushedNotifications []notification.Notification
@@ -326,8 +324,58 @@ func (vs *VideoService) saveFeedReadModel(ctx context.Context, v *Video) {
 	}
 	cacheCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancel()
-	item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.CreateTime, v.LikesCount, v.Popularity)
+	item := readmodel.NewFeedVideoItem(v.ID, v.AuthorID, v.Username, v.Title, v.Description, v.PlayURL, v.CoverURL, v.ContentType, v.ImageURLs, v.CreateTime, v.LikesCount, v.Popularity)
 	_ = readmodel.SaveFeedVideoItem(cacheCtx, vs.cache, item, readmodel.FeedVideoItemTTL)
+}
+
+func normalizePublishedContent(item *Video) error {
+	item.ContentType = strings.ToLower(strings.TrimSpace(item.ContentType))
+	item.PlayURL = strings.TrimSpace(item.PlayURL)
+	item.CoverURL = strings.TrimSpace(item.CoverURL)
+	if item.ContentType == "" {
+		if len(item.ImageURLs) > 0 || (item.PlayURL != "" && item.PlayURL == item.CoverURL) {
+			item.ContentType = ContentTypeImage
+		} else {
+			item.ContentType = ContentTypeVideo
+		}
+	}
+	switch item.ContentType {
+	case ContentTypeImage:
+		cleaned := make([]string, 0, len(item.ImageURLs))
+		seen := make(map[string]struct{}, len(item.ImageURLs))
+		for _, imageURL := range item.ImageURLs {
+			if imageURL = strings.TrimSpace(imageURL); imageURL != "" {
+				if _, exists := seen[imageURL]; exists {
+					continue
+				}
+				seen[imageURL] = struct{}{}
+				cleaned = append(cleaned, imageURL)
+			}
+		}
+		if len(cleaned) == 0 && item.CoverURL != "" {
+			cleaned = []string{item.CoverURL}
+		}
+		if len(cleaned) == 0 {
+			return errors.New("at least one image url is required")
+		}
+		if len(cleaned) > 9 {
+			return errors.New("image notes support at most 9 images")
+		}
+		item.ImageURLs = cleaned
+		item.CoverURL = cleaned[0]
+		item.PlayURL = ""
+	case ContentTypeVideo:
+		if item.PlayURL == "" {
+			return errors.New("play url is required")
+		}
+		if item.CoverURL == "" {
+			return errors.New("cover url is required")
+		}
+		item.ImageURLs = nil
+	default:
+		return errors.New("content_type must be image or video")
+	}
+	return nil
 }
 
 func (vs *VideoService) deleteFeedReadModel(id uint) {

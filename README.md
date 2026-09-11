@@ -36,6 +36,7 @@ docker compose up -d --build
 docker compose run --rm seed \
   --users 100 \
   --videos 300 \
+  --images 240 \
   --likes 2000 \
   --comments 500 \
   --follows 800
@@ -43,9 +44,9 @@ docker compose run --rm seed \
 
 测试用户为 `user001` ~ `user100`，密码均为 `123456`。seed 使用稳定标识和数据库唯一约束，相同参数重复运行不会产生重复数据；每次运行都会重新汇总视频的 `likes_count` / `popularity`，并重建 Redis 最新 Feed、热榜和视频读模型缓存。
 
-默认的 300 条视频分别使用 300 张固定且不重复的竖版 WebP 封面。首次运行会将封面下载到与 backend 共用的 `backend_uploads` 卷，后续运行直接复用本地文件；单张图片下载失败时会自动降级到相同图片 ID 的固定远程 URL。视频 MP4 使用 W3C 提供的公开测试素材。
+默认生成 300 条内容，其中包含 240 条图片笔记和 60 条视频笔记，分别使用 300 张固定且不重复的竖版 WebP 图片或封面。首次运行会将图片下载到与 backend 共用的 `backend_uploads` 卷，后续运行直接复用本地文件；单张图片下载失败时会自动降级到相同图片 ID 的固定远程 URL。视频 MP4 使用 W3C 提供的公开测试素材。
 
-数量参数均可省略，上述数值就是默认值。当前最多可生成 300 条具有唯一封面的视频；点赞数不能超过 `users * videos`，关注数不能超过 `users * (users - 1)`。
+数量参数均可省略，上述数值就是默认值。为了兼容原命令，`--videos` 仍表示生成的内容总数，`--images` 表示其中图片笔记的数量。当前最多生成 300 条具有唯一图片或封面的内容；点赞数不能超过 `users * videos`，关注数不能超过 `users * (users - 1)`。
 
 ## 本地开发
 

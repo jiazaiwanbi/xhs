@@ -19,7 +19,8 @@ import (
 func main() {
 	var opts seed.Options
 	flag.IntVar(&opts.Users, "users", 100, "number of deterministic test users")
-	flag.IntVar(&opts.Videos, "videos", 300, "number of deterministic test videos")
+	flag.IntVar(&opts.Videos, "videos", 300, "total number of deterministic test notes")
+	flag.IntVar(&opts.Images, "images", 240, "number of image notes within the seeded content")
 	flag.IntVar(&opts.Likes, "likes", 2000, "number of deterministic likes")
 	flag.IntVar(&opts.Comments, "comments", 500, "number of deterministic comments")
 	flag.IntVar(&opts.Follows, "follows", 800, "number of deterministic follow relationships")
@@ -58,6 +59,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("seed failed: %v", err)
 	}
-	fmt.Printf("seeded users=%d videos=%d likes=%d comments=%d follows=%d password=%s\n",
-		result.Users, result.Videos, result.Likes, result.Comments, result.Follows, seed.DefaultPassword)
+	fmt.Printf("seeded users=%d notes=%d images=%d videos=%d likes=%d comments=%d follows=%d password=%s\n",
+		result.Users, result.Videos, result.Images, result.Videos-result.Images, result.Likes, result.Comments, result.Follows, seed.DefaultPassword)
 }

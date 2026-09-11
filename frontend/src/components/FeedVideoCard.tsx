@@ -16,6 +16,7 @@ export default function FeedVideoCard({ item, canLike, busy, onToggleLike }: Pro
     <article className="feed-card">
       <Link className="feed-cover" to={`/video/${item.id}`} aria-label={`查看笔记：${item.title}`}>
         <img src={item.cover_url} alt={item.title} loading="lazy" />
+        {item.content_type === 'video' ? <span className="feed-type-badge">视频</span> : null}
       </Link>
       <div className="feed-content">
         <Link className="feed-title" to={`/video/${item.id}`}>{item.title}</Link>

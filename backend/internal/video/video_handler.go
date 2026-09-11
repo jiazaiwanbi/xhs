@@ -51,6 +51,8 @@ func (vh *VideoHandler) PublishVideo(c *gin.Context) {
 		Description: req.Description,
 		PlayURL:     req.PlayURL,
 		CoverURL:    req.CoverURL,
+		ContentType: req.ContentType,
+		ImageURLs:   req.ImageURLs,
 		CreateTime:  time.Now(),
 	}
 	if err := vh.service.Publish(c.Request.Context(), video, req.NotifyFollowers); err != nil {

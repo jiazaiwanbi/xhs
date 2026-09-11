@@ -49,6 +49,8 @@ export type Video = {
   description?: string
   play_url: string
   cover_url: string
+  content_type: 'image' | 'video'
+  image_urls?: string[]
   create_time: string
   likes_count: number
 }
@@ -74,6 +76,8 @@ export type FeedVideoItem = {
   description?: string
   play_url: string
   cover_url: string
+  content_type: 'image' | 'video'
+  image_urls?: string[]
   create_time: number
   likes_count: number
   is_liked: boolean

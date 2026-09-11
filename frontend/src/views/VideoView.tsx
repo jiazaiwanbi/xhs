@@ -56,7 +56,9 @@ export default function VideoView() {
       const res = await videoApi.publishVideo({
         title,
         description,
-        play_url: coverUrl,
+        content_type: 'image',
+        image_urls: [coverUrl],
+        play_url: '',
         cover_url: coverUrl,
         notify_followers: form.notifyFollowers,
       })

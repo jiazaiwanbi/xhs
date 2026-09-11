@@ -25,6 +25,7 @@ const DefaultPassword = "123456"
 type Options struct {
 	Users    int
 	Videos   int
+	Images   int
 	Likes    int
 	Comments int
 	Follows  int
@@ -33,6 +34,7 @@ type Options struct {
 type Result struct {
 	Users    int64
 	Videos   int64
+	Images   int64
 	Likes    int64
 	Comments int64
 	Follows  int64
@@ -51,8 +53,32 @@ var mediaLibrary = []media{
 	},
 }
 
+var seedImageTitles = []string{
+	"周末去山里吹吹风", "今天也要好好吃饭", "把春天装进相册", "城市散步随手拍",
+	"我的治愈系小角落", "下班后的松弛时刻", "最近很喜欢的穿搭", "巷子里的宝藏小店",
+	"阳光落在窗边", "和毛孩子的一天", "旅行中最难忘的一站", "简单又满足的早餐",
+}
+
+var seedVideoTitles = []string{
+	"一分钟记录今日份快乐", "晚霞出现的那一刻", "跟着镜头去旅行", "今天的厨房日记",
+	"城市夜晚慢慢走", "周末生活碎片", "好天气值得被记录", "拆箱最近的新发现",
+}
+
+var seedImageTitleDetails = []string{
+	"值得收藏的小发现", "被这一幕治愈了", "分享今日好心情", "慢下来感受生活",
+	"原图真的很有氛围", "随手拍也很出片", "藏在日常里的浪漫", "终于来打卡了",
+	"近期生活小结", "这一刻想和你分享", "普通日子也闪闪发光", "我的私藏清单",
+	"好喜欢今天的光", "记录一些新鲜事", "简单生活的幸福感", "今天的灵感来源",
+	"一眼就心动的画面", "生活需要一点仪式感", "最近反复喜欢的瞬间", "把快乐存进相册",
+}
+
+var seedVideoTitleDetails = []string{
+	"现场比镜头更美", "请查收今日份治愈", "沉浸式感受一下", "看到最后有惊喜",
+	"循环播放好多遍", "用镜头留住这一秒", "氛围感直接拉满", "一起看看沿途风景",
+}
+
 func (o Options) Validate() error {
-	if o.Users < 0 || o.Videos < 0 || o.Likes < 0 || o.Comments < 0 || o.Follows < 0 {
+	if o.Users < 0 || o.Videos < 0 || o.Images < 0 || o.Likes < 0 || o.Comments < 0 || o.Follows < 0 {
 		return errors.New("seed counts must be non-negative")
 	}
 	if o.Users == 0 && (o.Videos > 0 || o.Likes > 0 || o.Comments > 0 || o.Follows > 0) {
@@ -69,6 +95,9 @@ func (o Options) Validate() error {
 	}
 	if o.Videos > len(coverAssetIDs) {
 		return fmt.Errorf("videos exceeds the %d unique seed covers available", len(coverAssetIDs))
+	}
+	if o.Images > o.Videos {
+		return errors.New("images cannot exceed the total seeded notes")
 	}
 	return nil
 }
@@ -107,7 +136,7 @@ func Run(ctx context.Context, database *gorm.DB, cache *rediscache.Client, opts 
 			if err != nil {
 				return err
 			}
-			seededVideos, err = upsertVideos(tx, opts.Videos, users, coverURLs)
+			seededVideos, err = upsertVideos(tx, opts.Videos, opts.Images, users, coverURLs)
 			if err != nil {
 				return err
 			}
@@ -171,32 +200,47 @@ func upsertUsers(tx *gorm.DB, count int, passwordHash string) ([]account.Account
 	return users, nil
 }
 
-func upsertVideos(tx *gorm.DB, count int, users []account.Account, coverURLs []string) ([]video.Video, error) {
+func upsertVideos(tx *gorm.DB, count, imageCount int, users []account.Account, coverURLs []string) ([]video.Video, error) {
 	for i := 1; i <= count; i++ {
 		author := users[(i-1)%len(users)]
 		asset := mediaLibrary[(i-1)%len(mediaLibrary)]
-		title := fmt.Sprintf("[seed:%04d] Feed 测试视频 %04d", i, i)
+		seedKey := fmt.Sprintf("note-%04d", i)
+		isImage := isSeedImageNote(i, count, imageCount)
+		typeOrdinal := seedContentTypeOrdinal(i, count, imageCount, isImage)
+		contentType := video.ContentTypeVideo
+		playURL := asset.playURL
+		var imageURLs []string
+		title := buildSeedTitle(typeOrdinal, false)
+		if isImage {
+			contentType = video.ContentTypeImage
+			playURL = ""
+			imageURLs = []string{coverURLs[i-1]}
+			title = buildSeedTitle(typeOrdinal, true)
+		}
 		row := video.Video{
+			SeedKey:     &seedKey,
 			AuthorID:    author.ID,
 			Username:    author.Username,
 			Title:       title,
-			Description: fmt.Sprintf("可重复生成的 Feed 测试数据 #%s #seed", []string{"旅行", "生活", "技术", "美食"}[(i-1)%4]),
-			PlayURL:     asset.playURL,
+			Description: fmt.Sprintf("记录生活里值得分享的小瞬间 #%s", []string{"旅行", "生活", "穿搭", "美食", "家居", "宠物"}[(i-1)%6]),
+			PlayURL:     playURL,
 			CoverURL:    coverURLs[i-1],
+			ContentType: contentType,
+			ImageURLs:   imageURLs,
 			CreateTime:  time.Now().Add(-time.Duration(count-i) * 3 * time.Minute).Truncate(time.Millisecond),
 		}
 		var existing video.Video
-		err := tx.Where("title = ?", title).First(&existing).Error
+		legacyTitle := fmt.Sprintf("[seed:%04d] Feed 测试视频 %04d", i, i)
+		err := tx.Where("seed_key = ? OR (seed_key IS NULL AND title = ?)", seedKey, legacyTitle).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			if err := tx.Create(&row).Error; err != nil {
 				return nil, fmt.Errorf("seed video %d: %w", i, err)
 			}
 		} else if err != nil {
 			return nil, err
-		} else if err := tx.Model(&existing).Updates(map[string]any{
-			"author_id": author.ID, "username": author.Username, "description": row.Description,
-			"play_url": row.PlayURL, "cover_url": row.CoverURL,
-		}).Error; err != nil {
+		} else if err := tx.Model(&existing).Select(
+			"SeedKey", "AuthorID", "Username", "Title", "Description", "PlayURL", "CoverURL", "ContentType", "ImageURLs",
+		).Updates(&row).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -204,7 +248,7 @@ func upsertVideos(tx *gorm.DB, count int, users []account.Account, coverURLs []s
 	if count == 0 {
 		return rows, nil
 	}
-	if err := tx.Where("title IN ?", seedVideoTitles(count)).Find(&rows).Error; err != nil {
+	if err := tx.Where("seed_key IN ?", seedKeys(count)).Order("seed_key ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	if len(rows) != count {
@@ -228,13 +272,28 @@ func upsertLikes(tx *gorm.DB, count int, users []account.Account, videos []video
 func upsertComments(tx *gorm.DB, count int, users []account.Account, videos []video.Video) error {
 	for i := 1; i <= count; i++ {
 		author := users[(i-1)%len(users)]
+		target := videos[(i-1)%len(videos)]
+		seedKey := fmt.Sprintf("comment-%06d", i)
+		content := []string{"好有氛围感！", "收藏了，下次也去看看", "这个分享太实用了", "今天也被治愈到了", "拍得真好看", "很喜欢这种生活感"}[(i-1)%6]
+		if target.ContentType == video.ContentTypeVideo {
+			content = []string{"这个视频太有感觉了", "镜头语言很喜欢", "看到最后真的惊喜", "已经循环播放了"}[(i-1)%4]
+		}
 		row := video.Comment{
+			SeedKey:  &seedKey,
 			Username: author.Username,
 			AuthorID: author.ID,
-			VideoID:  videos[(i-1)%len(videos)].ID,
-			Content:  fmt.Sprintf("[seed:%06d] 很棒的测试视频！", i),
+			VideoID:  target.ID,
+			Content:  content,
 		}
-		if err := tx.Where("content = ?", row.Content).FirstOrCreate(&row).Error; err != nil {
+		legacyContent := fmt.Sprintf("[seed:%06d] 很棒的测试视频！", i)
+		var existing video.Comment
+		err := tx.Where("seed_key = ? OR (seed_key IS NULL AND content = ?)", seedKey, legacyContent).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = tx.Create(&row).Error
+		} else if err == nil {
+			err = tx.Model(&existing).Select("SeedKey", "Username", "AuthorID", "VideoID", "Content").Updates(&row).Error
+		}
+		if err != nil {
 			return fmt.Errorf("seed comment %d: %w", i, err)
 		}
 	}
@@ -292,7 +351,7 @@ func rebuildFeedCache(ctx context.Context, cache *rediscache.Client, videos []vi
 		member := fmt.Sprintf("%d", row.ID)
 		timeline = append(timeline, oredis.Z{Score: float64(row.CreateTime.UnixMilli()), Member: member})
 		hot = append(hot, oredis.Z{Score: float64(row.Popularity), Member: member})
-		item := readmodel.NewFeedVideoItem(row.ID, row.AuthorID, row.Username, row.Title, row.Description, row.PlayURL, row.CoverURL, row.CreateTime, row.LikesCount, row.Popularity)
+		item := readmodel.NewFeedVideoItem(row.ID, row.AuthorID, row.Username, row.Title, row.Description, row.PlayURL, row.CoverURL, row.ContentType, row.ImageURLs, row.CreateTime, row.LikesCount, row.Popularity)
 		if err := readmodel.SaveFeedVideoItem(ctx, cache, item, readmodel.FeedVideoItemTTL); err != nil {
 			return err
 		}
@@ -317,17 +376,20 @@ func inspectResult(database *gorm.DB, opts Options) (Result, error) {
 			return result, err
 		}
 	}
-	titles := seedVideoTitles(opts.Videos)
+	keys := seedKeys(opts.Videos)
 	if opts.Videos > 0 {
-		if err := database.Model(&video.Video{}).Where("title IN ?", titles).Count(&result.Videos).Error; err != nil {
+		if err := database.Model(&video.Video{}).Where("seed_key IN ?", keys).Count(&result.Videos).Error; err != nil {
 			return result, err
 		}
-		if err := database.Model(&video.Like{}).Where("video_id IN (?)", database.Model(&video.Video{}).Select("id").Where("title IN ?", titles)).Count(&result.Likes).Error; err != nil {
+		if err := database.Model(&video.Video{}).Where("seed_key IN ? AND content_type = ?", keys, video.ContentTypeImage).Count(&result.Images).Error; err != nil {
+			return result, err
+		}
+		if err := database.Model(&video.Like{}).Where("video_id IN (?)", database.Model(&video.Video{}).Select("id").Where("seed_key IN ?", keys)).Count(&result.Likes).Error; err != nil {
 			return result, err
 		}
 	}
 	if opts.Comments > 0 {
-		if err := database.Model(&video.Comment{}).Where("content LIKE ?", "[seed:%").Count(&result.Comments).Error; err != nil {
+		if err := database.Model(&video.Comment{}).Where("seed_key LIKE ?", "comment-%").Count(&result.Comments).Error; err != nil {
 			return result, err
 		}
 	}
@@ -337,7 +399,7 @@ func inspectResult(database *gorm.DB, opts Options) (Result, error) {
 			return result, err
 		}
 	}
-	log.Printf("seed complete: users=%d videos=%d likes=%d comments=%d follows=%d", result.Users, result.Videos, result.Likes, result.Comments, result.Follows)
+	log.Printf("seed complete: users=%d notes=%d images=%d videos=%d likes=%d comments=%d follows=%d", result.Users, result.Videos, result.Images, result.Videos-result.Images, result.Likes, result.Comments, result.Follows)
 	return result, nil
 }
 
@@ -349,10 +411,36 @@ func seedUsernames(count int) []string {
 	return rows
 }
 
-func seedVideoTitles(count int) []string {
+func seedKeys(count int) []string {
 	rows := make([]string, count)
 	for i := range rows {
-		rows[i] = fmt.Sprintf("[seed:%04d] Feed 测试视频 %04d", i+1, i+1)
+		rows[i] = fmt.Sprintf("note-%04d", i+1)
 	}
 	return rows
+}
+
+func buildSeedTitle(index int, image bool) string {
+	if image {
+		baseIndex := (index - 1) % len(seedImageTitles)
+		detailIndex := ((index - 1) / len(seedImageTitles)) % len(seedImageTitleDetails)
+		return seedImageTitles[baseIndex] + "｜" + seedImageTitleDetails[detailIndex]
+	}
+	baseIndex := (index - 1) % len(seedVideoTitles)
+	detailIndex := ((index - 1) / len(seedVideoTitles)) % len(seedVideoTitleDetails)
+	return seedVideoTitles[baseIndex] + "｜" + seedVideoTitleDetails[detailIndex]
+}
+
+func isSeedImageNote(index, total, imageCount int) bool {
+	if index <= 0 || total <= 0 || imageCount <= 0 {
+		return false
+	}
+	return index*imageCount/total > (index-1)*imageCount/total
+}
+
+func seedContentTypeOrdinal(index, total, imageCount int, image bool) int {
+	imagesThroughIndex := index * imageCount / total
+	if image {
+		return imagesThroughIndex
+	}
+	return index - imagesThroughIndex
 }
