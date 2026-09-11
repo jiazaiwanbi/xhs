@@ -225,7 +225,7 @@ export default function MessageView() {
               {contactItems.map((user) => (
                 <button key={user.id} className={`contact-row ${peerId === user.id ? 'active' : ''}`} type="button" onClick={() => void navigate(`/messages/${user.id}`)}>
                   <UserAvatar username={user.username} id={user.id} size={42} />
-                  <span className="contact-meta"><span className="contact-name">@{user.username}</span><span className="contact-id mono">#{user.id}</span></span>
+                  <span className="contact-meta"><span className="contact-name">@{user.username}</span><span className="contact-id">点击开始聊天</span></span>
                   <span className="contact-side">
                     {(messageUnreadCountBySender.get(user.id) ?? 0) > 0 ? <b className="count-badge">{messageUnreadCountBySender.get(user.id)! > 99 ? '99+' : messageUnreadCountBySender.get(user.id)}</b> : null}
                     <span className="contact-action">聊天</span>
@@ -273,7 +273,7 @@ export default function MessageView() {
                 <button className="icon-btn" type="button" title="返回" onClick={() => void navigate('/messages')}>‹</button>
                 <button className="peer" type="button" disabled={!state.peer} onClick={() => state.peer && void navigate(`/u/${state.peer.id}`)}>
                   <UserAvatar username={state.peer?.username ?? 'User'} id={state.peer?.id ?? peerId} size={44} />
-                  <span className="peer-meta"><span className="peer-name">@{state.peer?.username ?? '加载中'}</span><span className="peer-id mono">#{state.peer?.id ?? peerId}</span></span>
+                  <span className="peer-meta"><span className="peer-name">@{state.peer?.username ?? '加载中'}</span><span className="peer-id">查看个人主页</span></span>
                 </button>
                 <button className="ghost small" type="button" disabled={state.loading} onClick={() => void loadChat()}>刷新</button>
               </header>

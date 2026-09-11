@@ -80,56 +80,49 @@ export default function UserProfileView() {
   }, [auth.isLoggedIn])
 
   const listItems = drawer.tab === 'followers' ? state.followers : state.vloggers
+  const receivedLikes = state.videos.reduce((total, video) => total + video.likes_count, 0)
   return (
     <AppShell>
-      <div className="card">
-        <div className="row spread start">
-          <div className="row avatar-head">
-            <UserAvatar username={state.user?.username ?? 'User'} id={state.user?.id ?? userId} size={64} />
-            <div>
-              <div className="title">@{state.user?.username ?? '-'}</div>
-              <div className="subtle mono">#{state.user?.id ?? userId}</div>
-            </div>
-          </div>
-          <div className="row">
-            {isMe ? <button className="ghost" type="button" onClick={() => void navigate('/account')}>我的账号</button> : (
+      <main className="profile-page">
+        <section className="profile-hero">
+          <UserAvatar username={state.user?.username ?? 'User'} id={state.user?.id ?? userId} src={state.user?.avatar_url} size={176} />
+          <div className="profile-info">
+            <div className="profile-title-row">
+              <h1>{state.user?.username ?? '加载中…'}</h1>
+              <div className="profile-actions">
+                {isMe ? <button className="profile-settings" type="button" onClick={() => void navigate('/settings')}>编辑资料</button> : (
               <>
-                <button className="ghost" type="button" disabled={!state.user || state.loading} onClick={() => void navigate(`/messages/${userId}`)}>私信</button>
-                <button className="primary" type="button" disabled={!state.user || state.loading} onClick={() => void toggleFollow()}>{social.isFollowing(userId) ? '已关注' : '关注'}</button>
+                    <button className="profile-settings" type="button" disabled={!state.user || state.loading} onClick={() => void navigate(`/messages/${userId}`)}>私信</button>
+                    <button className="follow-primary" type="button" disabled={!state.user || state.loading} onClick={() => void toggleFollow()}>{social.isFollowing(userId) ? '已关注' : '关注'}</button>
               </>
             )}
+              </div>
+            </div>
+            <div className="profile-id">账号 ID：{state.user?.id ?? userId}</div>
+            <p className={`profile-bio ${state.user?.bio ? '' : 'empty'}`}>{state.user?.bio || '还没有简介'}</p>
+            <div className="profile-stats">
+              <button type="button" disabled={!auth.isLoggedIn || state.socialLoading} onClick={() => setDrawer({ open: true, tab: 'following' })}><b>{auth.isLoggedIn ? (state.socialLoading ? '…' : state.vloggers.length) : '—'}</b><span>关注</span></button>
+              <button type="button" disabled={!auth.isLoggedIn || state.socialLoading} onClick={() => setDrawer({ open: true, tab: 'followers' })}><b>{auth.isLoggedIn ? (state.socialLoading ? '…' : state.followers.length) : '—'}</b><span>粉丝</span></button>
+              <div><b>{receivedLikes}</b><span>获赞</span></div>
+            </div>
+            {state.error ? <div className="hint bad spaced">{state.error}</div> : null}
+            {state.socialError ? <div className="subtle spaced">社交信息加载失败：{state.socialError}</div> : null}
           </div>
-        </div>
-        {state.loading ? <div className="hint spaced">加载中...</div> : null}
-        {state.error ? <div className="hint bad spaced">{state.error}</div> : null}
-        {!state.error ? (
-          <div className="row spaced">
-            <button className="metric" type="button" disabled={!auth.isLoggedIn || state.socialLoading} onClick={() => setDrawer({ open: true, tab: 'followers' })}>
-              <div className="metric-num">{auth.isLoggedIn ? (state.socialLoading ? '...' : state.followers.length) : '-'}</div>
-              <div className="metric-label">粉丝</div>
-            </button>
-            <button className="metric" type="button" disabled={!auth.isLoggedIn || state.socialLoading} onClick={() => setDrawer({ open: true, tab: 'following' })}>
-              <div className="metric-num">{auth.isLoggedIn ? (state.socialLoading ? '...' : state.vloggers.length) : '-'}</div>
-              <div className="metric-label">关注</div>
-            </button>
-            <div className="metric static"><div className="metric-num">{state.videos.length}</div><div className="metric-label">笔记</div></div>
-            {!auth.isLoggedIn ? <div className="subtle">登录后可查看粉丝/关注列表</div> : null}
-            {state.socialError ? <div className="subtle">社交信息加载失败：{state.socialError}</div> : null}
-          </div>
-        ) : null}
-      </div>
-      <div className="card spaced">
-        <div className="row spread"><p className="title">公开笔记</p><div className="subtle">点击封面进入笔记详情</div></div>
-        {state.videos.length === 0 ? <div className="hint spaced">这个账号还没有发布笔记</div> : null}
-        <div className="video-grid spaced">
+        </section>
+        <nav className="profile-tabs"><button className="active" type="button">发布的内容</button></nav>
+        <section className="profile-content">
+          {state.loading ? <div className="state-panel">正在加载主页…</div> : null}
+          {!state.loading && !state.error && state.videos.length === 0 ? <div className="profile-empty"><div className="profile-empty-icon">⌁</div><p>这个账号还没有发布内容</p></div> : null}
+          <div className="video-grid spaced">
           {state.videos.map((v) => (
             <button key={v.id} className="video-card" type="button" onClick={() => void navigate(`/video/${v.id}`)}>
               <img className="video-cover" src={v.cover_url} alt={v.title} loading="lazy" />
               <div className="video-meta"><div className="video-title">{v.title}</div><div className="video-sub subtle">♥ {v.likes_count} · {new Date(v.create_time).toLocaleDateString()}</div></div>
             </button>
           ))}
-        </div>
-      </div>
+          </div>
+        </section>
+      </main>
       {drawer.open ? <UserDrawer title={drawer.tab === 'followers' ? '粉丝' : '关注'} items={listItems} loading={state.socialLoading} error={state.socialError} onClose={() => setDrawer((s) => ({ ...s, open: false }))} onUser={(id) => { setDrawer((s) => ({ ...s, open: false })); void navigate(`/u/${id}`) }} /> : null}
     </AppShell>
   )

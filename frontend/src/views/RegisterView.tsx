@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import * as accountApi from '../api/account'
 import AppShell from '../components/AppShell'
+import AuthFrame from '../components/AuthFrame'
 import { useToast } from '../stores/toast'
 
 export default function RegisterView() {
@@ -16,7 +17,7 @@ export default function RegisterView() {
     if (busy) return
     const username = form.username.trim()
     const password = form.password.trim()
-    if (!username || !password) return toast.error('请输入 username 和 password')
+    if (!username || !password) return toast.error('请输入用户名和密码')
     setBusy(true)
     try {
       await accountApi.register(username, password)
@@ -31,27 +32,19 @@ export default function RegisterView() {
 
   return (
     <AppShell>
-      <div className="grid two">
-        <div className="card">
-          <p className="title">注册</p>
-          <p className="subtle">创建新账号（对应后端 `/account/register`）。</p>
-          <div className="grid spaced">
-            <label>username</label>
-            <input value={form.username} autoComplete="username" onChange={(e) => setForm((s) => ({ ...s, username: e.target.value.trim() }))} />
-            <label>password</label>
-            <input value={form.password} type="password" autoComplete="new-password" onChange={(e) => setForm((s) => ({ ...s, password: e.target.value.trim() }))} />
-            <div className="row end">
-              <button className="primary" type="button" disabled={busy} onClick={() => void submit()}>
-                注册
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <p className="title">提示</p>
-          <p className="muted">注册成功后会跳回「账号」页进行登录。</p>
-        </div>
-      </div>
+      <AuthFrame
+        title="创建账号"
+        subtitle="加入内容社区，记录和分享你的生活"
+        closeTo="/account"
+        footer={<button className="login-register" type="button" disabled={busy} onClick={() => void navigate('/account')}>已有账号，去登录</button>}
+      >
+        <label className="sr-only" htmlFor="register-username">用户名</label>
+        <input id="register-username" value={form.username} placeholder="设置用户名" autoComplete="username" onChange={(e) => setForm((s) => ({ ...s, username: e.target.value.trim() }))} />
+        <label className="sr-only" htmlFor="register-password">密码</label>
+        <input id="register-password" value={form.password} type="password" placeholder="设置密码" autoComplete="new-password" onChange={(e) => setForm((s) => ({ ...s, password: e.target.value.trim() }))} onKeyDown={(e) => { if (e.key === 'Enter') void submit() }} />
+        <button className="login-submit" type="button" disabled={busy} onClick={() => void submit()}>{busy ? '注册中…' : '注册'}</button>
+        <p className="login-agreement">注册即代表同意《用户协议》和《隐私政策》</p>
+      </AuthFrame>
     </AppShell>
   )
 }

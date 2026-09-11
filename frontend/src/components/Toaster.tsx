@@ -1,4 +1,5 @@
 import { useToast } from '../stores/toast'
+import Icon from './Icon'
 
 export default function Toaster() {
   const toast = useToast()
@@ -8,7 +9,7 @@ export default function Toaster() {
         <div key={t.id} className={`toast ${t.type}`}>
           <div className="toast-msg">{t.message}</div>
           <button className="toast-x" type="button" aria-label="关闭" onClick={() => toast.remove(t.id)}>
-            x
+            <Icon name="close" size={16} />
           </button>
         </div>
       ))}

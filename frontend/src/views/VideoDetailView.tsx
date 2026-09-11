@@ -158,6 +158,7 @@ export default function VideoDetailView() {
   }, [navigate])
 
   const video = state.video
+  const isImageNote = !!video && (video.play_url === video.cover_url || /\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i.test(video.play_url))
   return (
     <AppShell full>
       <div className="detail-page" role="dialog" aria-modal="true" aria-label="笔记详情" onMouseDown={(event) => event.currentTarget === event.target && void navigate('/')}>
@@ -167,7 +168,7 @@ export default function VideoDetailView() {
         {video ? (
           <div className="note-reader">
             <section className="media-panel">
-              <video className="note-cover" src={video.play_url} poster={video.cover_url} controls playsInline aria-label={video.title} />
+              {isImageNote ? <img className="note-cover" src={video.cover_url || video.play_url} alt={video.title} /> : <video className="note-cover" src={video.play_url} poster={video.cover_url} controls playsInline aria-label={video.title} />}
             </section>
             <aside className="detail-panel">
               <section className="note-info">

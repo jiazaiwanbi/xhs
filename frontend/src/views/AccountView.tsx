@@ -7,8 +7,9 @@ import * as likeApi from '../api/like'
 import type { Account, Video } from '../api/types'
 import * as videoApi from '../api/video'
 import AppShell from '../components/AppShell'
-import UserAvatar from '../components/UserAvatar'
+import AuthFrame from '../components/AuthFrame'
 import Icon from '../components/Icon'
+import UserAvatar from '../components/UserAvatar'
 import { useAuth } from '../stores/auth'
 import { useSocial } from '../stores/social'
 import { useToast } from '../stores/toast'
@@ -101,18 +102,11 @@ export default function AccountView() {
   return (
     <AppShell>
       {!auth.isLoggedIn ? (
-        <div className="login-wrap" role="dialog" aria-modal="true" aria-label="登录">
-          <div className="login-card">
-            <button className="login-close" type="button" onClick={() => void navigate('/')} aria-label="关闭"><Icon name="close" /></button>
-            <section className="login-brand">
-              <div className="login-logo">内容社区</div>
-              <h2>发现真实、有趣的生活</h2>
-              <div className="login-orbit"><span>穿搭</span><span>美食</span><span>旅行</span><span>灵感</span></div>
-              <p>分享和发现生活里的每一个闪光时刻</p>
-            </section>
-            <section className="login-form-panel">
-              <h1>账号登录</h1>
-              <p className="login-lead">登录后即可点赞、评论与关注喜欢的创作者</p>
+        <AuthFrame
+          title="账号登录"
+          subtitle="登录后即可点赞、评论与关注喜欢的创作者"
+          footer={<button className="login-register" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>新用户注册</button>}
+        >
               <label className="sr-only" htmlFor="login-username">用户名</label>
               <input id="login-username" value={loginForm.username} placeholder="输入用户名" autoComplete="username" onChange={(e) => setLoginForm((s) => ({ ...s, username: e.target.value.trim() }))} />
               <label className="sr-only" htmlFor="login-password">密码</label>
@@ -129,10 +123,7 @@ export default function AccountView() {
               />
               <button className="login-submit" type="button" disabled={busy} onClick={() => void onLogin()}>{busy ? '登录中…' : '登录'}</button>
               <p className="login-agreement">登录即代表同意《用户协议》和《隐私政策》</p>
-              <button className="login-register" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>新用户注册</button>
-            </section>
-          </div>
-        </div>
+        </AuthFrame>
       ) : (
         <main className="profile-page">
           <section className="profile-hero">
@@ -197,7 +188,7 @@ export function UserDrawer({ title, items, loading, error, onClose, onUser }: { 
         <div className="drawer-head">
           <div className="drawer-title">{title}</div>
           <button className="drawer-x" type="button" onClick={onClose}>
-            x
+            <Icon name="close" size={18} />
           </button>
         </div>
         <div className="drawer-body">
@@ -209,7 +200,7 @@ export function UserDrawer({ title, items, loading, error, onClose, onUser }: { 
               <UserAvatar username={u.username} id={u.id} size={40} />
               <div className="user-meta">
                 <div className="user-name">@{u.username}</div>
-                <div className="user-id mono">#{u.id}</div>
+                <div className="user-id">查看个人主页</div>
               </div>
             </button>
           )) : null}

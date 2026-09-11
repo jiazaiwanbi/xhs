@@ -82,9 +82,9 @@ export default function HomeView() {
           </div>
         </section>
 
-        {currentState.loading && currentState.items.length === 0 ? <div className="center-hint">加载中...</div> : null}
-        {currentState.error && currentState.items.length === 0 ? <div className="center-hint bad">{currentState.error}</div> : null}
-        {!currentState.loading && !currentState.error && filteredItems.length === 0 ? <div className="center-hint">没有匹配内容</div> : null}
+        {currentState.loading && currentState.items.length === 0 ? <div className="feed-skeleton" aria-label="正在加载内容">{Array.from({ length: 8 }, (_, index) => <div className="skeleton-card" key={index}><div /><span /><small /></div>)}</div> : null}
+        {currentState.error && currentState.items.length === 0 ? <div className="state-panel error"><span>{currentState.error}</span><button className="quiet-btn" type="button" onClick={() => void refreshCurrentTab()}>重新加载</button></div> : null}
+        {!currentState.loading && !currentState.error && filteredItems.length === 0 ? <div className="state-panel">{q ? '没有找到相关内容' : '暂时没有内容'}</div> : null}
         {filteredItems.length ? (
           <section className="waterfall">
             {filteredItems.map((item) => (

@@ -55,38 +55,24 @@ export default function HotView() {
   }, [])
 
   return (
-    <AppShell>
-      <div className="card">
-        <div className="row spread baseline">
-          <div>
-            <p className="title">爆款笔记热榜</p>
-            <p className="subtle">按互动热度排序，适合演示热门图文内容流</p>
-          </div>
-          <div className="row">
-            <label className="subtle">limit</label>
-            <input value={state.limit} type="number" min="1" max="50" style={{ width: 90 }} disabled={state.loading} onChange={(e) => setState((s) => ({ ...s, limit: Number(e.target.value) }))} />
-            <button className="primary" type="button" disabled={state.loading} onClick={() => void loadHot(true)}>
-              刷新
-            </button>
-            <button type="button" disabled={state.loading || !state.hasMore} onClick={() => void loadHot(false)}>
-              加载更多
-            </button>
-          </div>
-        </div>
-        {state.error ? <div className="pill bad spaced">错误：{state.error}</div> : null}
-        {state.loading && state.items.length === 0 ? <div className="subtle spaced">加载中...</div> : null}
-        {!state.loading && state.items.length === 0 ? <div className="subtle spaced">暂无内容</div> : null}
+    <AppShell full>
+      <main className="page hot-page">
+        <header className="section-heading"><div><h1>热门内容</h1><p>发现社区里正在流行的精彩内容</p></div><button className="quiet-btn" type="button" disabled={state.loading} onClick={() => void loadHot(true)}>刷新</button></header>
+        {state.error ? <div className="state-panel error">{state.error}<button type="button" onClick={() => void loadHot(true)}>重新加载</button></div> : null}
+        {state.loading && state.items.length === 0 ? <div className="state-panel">正在加载热门内容…</div> : null}
+        {!state.loading && !state.error && state.items.length === 0 ? <div className="state-panel">暂时没有热门内容</div> : null}
         {state.items.length ? (
-          <div className="rank-list spaced">
+          <div className="hot-grid">
             {state.items.map((item, idx) => (
-              <div key={`hot-${item.id}`} className="rank-row">
-                <div className={`rank-num ${idx < 3 ? 'top' : ''}`}>{idx + 1}</div>
+              <div key={`hot-${item.id}`} className="hot-card-wrap">
+                <div className={`hot-rank ${idx < 3 ? 'top' : ''}`}>{idx + 1}</div>
                 <FeedVideoCard item={item} canLike={auth.isLoggedIn} busy={!!likeBusy[String(item.id)]} onToggleLike={(v) => void toggleLike(v)} />
               </div>
             ))}
           </div>
         ) : null}
-      </div>
+        {state.items.length && state.hasMore ? <div className="load-more-row"><button className="quiet-btn" type="button" disabled={state.loading} onClick={() => void loadHot(false)}>{state.loading ? '加载中…' : '加载更多'}</button></div> : null}
+      </main>
     </AppShell>
   )
 }

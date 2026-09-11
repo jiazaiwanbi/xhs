@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import * as accountApi from '../api/account'
 import AppShell from '../components/AppShell'
+import AuthFrame from '../components/AuthFrame'
 import { useAuth } from '../stores/auth'
 import { useToast } from '../stores/toast'
 
@@ -36,27 +37,14 @@ export default function ChangePasswordView() {
 
   return (
     <AppShell>
-      <div className="grid two">
-        <div className="card">
-          <p className="title">修改密码</p>
-          <p className="subtle">当前账号：@{username}</p>
-          <div className="grid spaced">
-            <label>old_password</label>
-            <input value={form.oldPassword} type="password" autoComplete="current-password" onChange={(e) => setForm((s) => ({ ...s, oldPassword: e.target.value.trim() }))} />
-            <label>new_password</label>
-            <input value={form.newPassword} type="password" autoComplete="new-password" onChange={(e) => setForm((s) => ({ ...s, newPassword: e.target.value.trim() }))} />
-            <div className="row end">
-              <button className="primary" type="button" disabled={busy} onClick={() => void submit()}>
-                提交
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <p className="title">提示</p>
-          <p className="muted">改密成功后后端会让旧 token 失效；请在「账号」页重新登录。</p>
-        </div>
-      </div>
+      <AuthFrame title="修改密码" subtitle={`当前账号：${username}`} closeTo="/settings">
+        <label className="sr-only" htmlFor="current-password">当前密码</label>
+        <input id="current-password" value={form.oldPassword} type="password" placeholder="输入当前密码" autoComplete="current-password" onChange={(e) => setForm((s) => ({ ...s, oldPassword: e.target.value.trim() }))} />
+        <label className="sr-only" htmlFor="new-password">新密码</label>
+        <input id="new-password" value={form.newPassword} type="password" placeholder="设置新密码" autoComplete="new-password" onChange={(e) => setForm((s) => ({ ...s, newPassword: e.target.value.trim() }))} onKeyDown={(e) => { if (e.key === 'Enter') void submit() }} />
+        <button className="login-submit" type="button" disabled={busy} onClick={() => void submit()}>{busy ? '提交中…' : '确认修改'}</button>
+        <p className="login-agreement">修改成功后，需要使用新密码重新登录</p>
+      </AuthFrame>
     </AppShell>
   )
 }

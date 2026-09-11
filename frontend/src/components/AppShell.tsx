@@ -35,9 +35,7 @@ export default function AppShell({
 
   const userLabel = useMemo(() => {
     if (!auth.isLoggedIn) return '未登录'
-    const username = auth.claims?.username ?? '(unknown)'
-    const accountId = auth.claims?.account_id
-    return accountId ? `${username} #${accountId}` : username
+    return auth.claims?.username ?? '我的主页'
   }, [auth.claims, auth.isLoggedIn])
 
   function onSearch() {
@@ -58,10 +56,10 @@ export default function AppShell({
           <NavLink className="dy-nav-link" to="/video" end>
             <Icon name="camera" /><span>发布</span>
           </NavLink>
-          <NavLink className="dy-nav-link" to="/messages">
+          <NavLink className="dy-nav-link" to="/messages/likes">
             <Icon name="bell" /><span>通知</span>{auth.isLoggedIn && notifications.unreadCount > 0 ? <b className="dy-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</b> : null}
           </NavLink>
-          <NavLink className="dy-nav-link" to="/messages">
+          <NavLink className="dy-nav-link" to="/messages" end>
             <Icon name="message" /><span>消息</span>
           </NavLink>
           <NavLink className="dy-nav-link" to="/account">
@@ -82,7 +80,7 @@ export default function AppShell({
             <input
               value={search}
               className="dy-search-input"
-              placeholder="登录探索更多内容"
+              placeholder={auth.isLoggedIn ? '搜索内容或创作者' : '登录探索更多内容'}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onSearch()
@@ -106,7 +104,7 @@ export default function AppShell({
             </NavLink>
           ) : null}
           <NavLink className="dy-mobile-link" to="/account">
-            账号
+            我的
           </NavLink>
         </nav>
 
