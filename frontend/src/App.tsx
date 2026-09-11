@@ -6,7 +6,6 @@ import ChangePasswordView from './views/ChangePasswordView'
 import HomeView from './views/HomeView'
 import HotView from './views/HotView'
 import MessageView from './views/MessageView'
-import RegisterView from './views/RegisterView'
 import SettingsView from './views/SettingsView'
 import UserProfileView from './views/UserProfileView'
 import VideoDetailView from './views/VideoDetailView'
@@ -35,7 +34,7 @@ export default function App() {
       />
       <Route path="/video/:id" element={<VideoDetailView />} />
       <Route path="/account" element={<AccountView />} />
-      <Route path="/account/register" element={<RegisterView />} />
+      <Route path="/account/register" element={<Navigate to="/account" replace />} />
       <Route
         path="/account/change-password"
         element={

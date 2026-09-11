@@ -16,6 +16,7 @@ import { useToast } from '../stores/toast'
 
 type VideoTab = 'works' | 'likes'
 type ListTab = 'followers' | 'following'
+type AuthMode = 'login' | 'register'
 
 export default function AccountView() {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ export default function AccountView() {
   const social = useSocial()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   const [profile, setProfile] = useState<Account | null>(null)
   const [myVideos, setMyVideos] = useState({ loading: false, error: '', items: [] as Video[] })
@@ -72,6 +74,30 @@ export default function AccountView() {
     }
   }
 
+  async function onRegister() {
+    if (busy) return
+    const username = loginForm.username.trim()
+    const password = loginForm.password.trim()
+    if (!username || !password) return toast.error('请输入用户名和密码')
+    setBusy(true)
+    try {
+      await accountApi.register(username, password)
+      setLoginForm({ username, password: '' })
+      setAuthMode('login')
+      toast.success('注册成功，请登录')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function switchAuthMode(mode: AuthMode) {
+    if (busy) return
+    setAuthMode(mode)
+    setLoginForm((current) => ({ ...current, password: '' }))
+  }
+
   useEffect(() => {
     if (auth.isLoggedIn && me.id) void loadMyVideos()
     if (!auth.isLoggedIn) {
@@ -103,26 +129,28 @@ export default function AccountView() {
     <AppShell>
       {!auth.isLoggedIn ? (
         <AuthFrame
-          title="账号登录"
-          subtitle="登录后即可点赞、评论与关注喜欢的创作者"
-          footer={<button className="login-register" type="button" disabled={busy} onClick={() => void navigate('/account/register')}>新用户注册</button>}
+          title={authMode === 'login' ? '账号登录' : '创建账号'}
+          subtitle={authMode === 'login' ? '登录后即可点赞、评论与关注喜欢的创作者' : '加入内容社区，记录和分享你的生活'}
+          footer={authMode === 'login'
+            ? <button className="login-register" type="button" disabled={busy} onClick={() => switchAuthMode('register')}>新用户注册</button>
+            : <button className="login-register" type="button" disabled={busy} onClick={() => switchAuthMode('login')}>已有账号，去登录</button>}
         >
-              <label className="sr-only" htmlFor="login-username">用户名</label>
-              <input id="login-username" value={loginForm.username} placeholder="输入用户名" autoComplete="username" onChange={(e) => setLoginForm((s) => ({ ...s, username: e.target.value.trim() }))} />
-              <label className="sr-only" htmlFor="login-password">密码</label>
+              <label className="sr-only" htmlFor="account-username">用户名</label>
+              <input id="account-username" value={loginForm.username} placeholder={authMode === 'login' ? '输入用户名' : '设置用户名'} autoComplete="username" onChange={(e) => setLoginForm((s) => ({ ...s, username: e.target.value.trim() }))} />
+              <label className="sr-only" htmlFor="account-password">密码</label>
               <input
-                id="login-password"
+                id="account-password"
                 value={loginForm.password}
                 type="password"
-                placeholder="输入密码"
-                autoComplete="current-password"
+                placeholder={authMode === 'login' ? '输入密码' : '设置密码'}
+                autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                 onChange={(e) => setLoginForm((s) => ({ ...s, password: e.target.value.trim() }))}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') void onLogin()
+                  if (e.key === 'Enter') void (authMode === 'login' ? onLogin() : onRegister())
                 }}
               />
-              <button className="login-submit" type="button" disabled={busy} onClick={() => void onLogin()}>{busy ? '登录中…' : '登录'}</button>
-              <p className="login-agreement">登录即代表同意《用户协议》和《隐私政策》</p>
+              <button className="login-submit" type="button" disabled={busy} onClick={() => void (authMode === 'login' ? onLogin() : onRegister())}>{busy ? (authMode === 'login' ? '登录中…' : '注册中…') : (authMode === 'login' ? '登录' : '注册')}</button>
+              <p className="login-agreement">{authMode === 'login' ? '登录' : '注册'}即代表同意《用户协议》和《隐私政策》</p>
         </AuthFrame>
       ) : (
         <main className="profile-page">
